@@ -12,6 +12,9 @@ import { ProductsModule } from './modules/products/products.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { ListingsModule } from './modules/listings/listings.module';
+import { OrdersModule } from './modules/orders/orders.module';
+import { SyncModule } from './modules/sync/sync.module';
 
 @Module({
   imports: [
@@ -26,6 +29,9 @@ import { AuditModule } from './modules/audit/audit.module';
     ChannelsModule,
     ProductsModule,
     DashboardModule,
+    ListingsModule,
+    OrdersModule,
+    SyncModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

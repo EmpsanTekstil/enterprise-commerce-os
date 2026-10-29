@@ -17,6 +17,9 @@ jobs:
       CREDENTIALS_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       ADMIN_EMAIL: admin@example.com
       ADMIN_PASSWORD: Admin123!
+      SEED_DEMO: '1'
+      ENABLE_MOCK_CHANNEL: '1'
+      SYNC_SCHEDULER: 'off'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

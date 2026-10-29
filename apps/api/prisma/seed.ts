@@ -24,8 +24,9 @@ async function main() {
     await prisma.permission.upsert({ where: { key }, update: { description }, create: { key, description } });
   }
 
-  // 2) Kanal kataloğu
-  for (const c of CHANNELS) {
+  // 2) Kanal kataloğu (+ test kanalı yalnızca test/mock modunda)
+  const channels = [...CHANNELS, ...(process.env.ENABLE_MOCK_CHANNEL === '1' || process.env.NODE_ENV === 'test' ? [{ code: 'mock', name: 'Test Kanalı', kind: 'OTHER' } as const] : [])];
+  for (const c of channels) {
     await prisma.salesChannel.upsert({ where: { code: c.code }, update: { name: c.name, kind: c.kind }, create: c });
   }
 

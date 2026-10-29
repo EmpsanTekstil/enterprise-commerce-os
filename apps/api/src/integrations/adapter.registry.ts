@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ChannelAdapter } from './adapter.interface';
 import { TrendyolAdapter } from './trendyol/trendyol.adapter';
 import { PlaceholderAdapter } from './placeholder.adapter';
+import { MockAdapter } from './mock/mock.adapter';
 
 /**
  * Kanal adaptörlerinin tek kayıt noktası.
@@ -21,6 +22,7 @@ export class AdapterRegistry {
       new PlaceholderAdapter('idefix', 'idefix'),
       new PlaceholderAdapter('shopify', 'Shopify'),
     ];
+    if (process.env.ENABLE_MOCK_CHANNEL === '1' || process.env.NODE_ENV === 'test') list.push(new MockAdapter());
     for (const a of list) this.adapters.set(a.code, a);
   }
 

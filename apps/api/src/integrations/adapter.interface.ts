@@ -148,6 +148,9 @@ export interface ChannelAdapter {
   readonly displayName: string;
   readonly capabilities: CapabilityMatrix;
 
+  /** Kanalın ham sipariş durumunu sistem durumuna çevirir (yoksa genel eşleme kullanılır). */
+  mapOrderStatus?(channelStatus: string): string;
+
   /** Kimlik bilgilerinin doğruluğunu kanal API'sine gerçek bir çağrıyla test eder. */
   testConnection(ctx: AdapterContext): Promise<{ ok: boolean; message: string }>;
 
