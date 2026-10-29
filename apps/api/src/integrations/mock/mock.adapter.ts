@@ -1,5 +1,5 @@
 import {
-  AdapterContext, CapabilityMatrix, ChannelAdapter, ExternalCategory, ExternalOrder, ExternalProduct, PagedResult, PushResult,
+  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalCategory, ExternalOrder, ExternalProduct, PagedResult, PushResult,
 } from '../adapter.interface';
 
 /**
@@ -14,6 +14,10 @@ export class MockAdapter implements ChannelAdapter {
   static pushed: { accountId: string; items: unknown[] }[] = [];
   /** Doluysa fetchOrders yalnızca bunları döndürür (testlerde durum değişimi simülasyonu) */
   static extraOrders: ExternalOrder[] = [];
+  /** Testler için: createProducts ile gönderilenler */
+  static created: ExternalProduct[] = [];
+  /** Testler için: batch sonucu (varsayılan: hepsi başarılı; barkodu '...FAIL' ile bitenler başarısız) */
+  static batchDone = true;
 
   readonly capabilities: CapabilityMatrix = {
     'products.read': { status: 'supported' }, 'products.create': { status: 'supported' }, 'products.update': { status: 'supported' },
@@ -26,6 +30,28 @@ export class MockAdapter implements ChannelAdapter {
 
   async testConnection(ctx: AdapterContext) {
     return ctx.credentials.apiKey === 'test' ? { ok: true, message: 'Test kanalı bağlı' } : { ok: false, message: 'apiKey "test" olmalı' };
+  }
+
+  async fetchCategoryAttributes(_ctx: AdapterContext, categoryExternalId: string): Promise<ChannelAttributeDef[]> {
+    if (categoryExternalId !== '11') return [];
+    return [
+      { id: '338', name: 'Renk', required: true, allowCustom: false, varianter: true, values: [{ id: '1', name: 'Siyah' }, { id: '2', name: 'Beyaz' }] },
+      { id: '343', name: 'Beden', required: true, allowCustom: true, varianter: true, values: [{ id: '10', name: 'S' }, { id: '11', name: 'M' }] },
+      { id: '47', name: 'Materyal', required: false, allowCustom: true, varianter: false },
+    ];
+  }
+  async fetchAttributeValues(_ctx: AdapterContext, _c: string, attributeId: string) {
+    return attributeId === '338' ? [{ id: '1', name: 'Siyah' }, { id: '2', name: 'Beyaz' }, { id: '3', name: 'Kırmızı' }] : [];
+  }
+  async findBrands(_ctx: AdapterContext, name: string): Promise<ExternalBrand[]> {
+    return name.toLowerCase().includes('demo') ? [{ externalId: '777', name: 'DemoMarka' }] : [];
+  }
+  async createProducts(_ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    MockAdapter.created.push(...products);
+    return products.map((p) => ({ ok: true, externalId: p.barcode ?? p.externalId, batchRequestId: 'mock-batch-' + products.length }));
+  }
+  async checkBatch(): Promise<BatchStatus> {
+    return { done: MockAdapter.batchDone, items: MockAdapter.created.map((p) => { const b = p.barcode ?? p.externalId; return { externalId: b, ok: !b.endsWith('FAIL'), errors: b.endsWith('FAIL') ? ['Görsel boyutu uygun değil'] : [] }; }) };
   }
 
   async fetchCategories(): Promise<ExternalCategory[]> {

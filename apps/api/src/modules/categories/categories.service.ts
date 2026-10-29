@@ -66,8 +66,17 @@ export class CategoriesService {
     const adapter = this.registry.get(account.channel.code);
     if (!adapter.fetchCategoryAttributes) return null;
     const attrs = await adapter.fetchCategoryAttributes(this.channels.buildContext(account), cat.externalId);
-    await this.prisma.channelCategory.update({ where: { id: cat.id }, data: { attributesJson: attrs as Prisma.InputJsonValue, fetchedAt: new Date() } });
+    await this.prisma.channelCategory.update({ where: { id: cat.id }, data: { attributesJson: attrs as unknown as Prisma.InputJsonValue, fetchedAt: new Date() } });
     return attrs;
+  }
+
+  async attributeValues(user: JwtPayload, accountId: string, channelCategoryId: string, attributeId: string) {
+    const account = await this.channels.getOwned(user, accountId);
+    const cat = await this.prisma.channelCategory.findFirst({ where: { id: channelCategoryId, channelAccountId: accountId } });
+    if (!cat) throw new NotFoundException('Kanal kategorisi bulunamadı');
+    const adapter = this.registry.get(account.channel.code);
+    if (!adapter.fetchAttributeValues) return [];
+    return adapter.fetchAttributeValues(this.channels.buildContext(account), cat.externalId, attributeId);
   }
 
   // ---------- Eşleştirme ----------

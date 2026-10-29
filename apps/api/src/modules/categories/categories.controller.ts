@@ -32,6 +32,9 @@ export class CategoriesController {
   @Get('channel/:accountId/:channelCategoryId/attributes') @RequirePermissions('listings.read')
   attrs(@CurrentUser() u: JwtPayload, @Param('accountId') a: string, @Param('channelCategoryId') c: string, @Query('refresh') refresh?: string) { return this.svc.channelCategoryAttributes(u, a, c, refresh === '1'); }
 
+  @Get('channel/:accountId/:channelCategoryId/attributes/:attributeId/values') @RequirePermissions('listings.read')
+  values(@CurrentUser() u: JwtPayload, @Param('accountId') a: string, @Param('channelCategoryId') c: string, @Param('attributeId') at: string) { return this.svc.attributeValues(u, a, c, at); }
+
   @Get('mappings/:accountId') @RequirePermissions('listings.read')
   mappings(@CurrentUser() u: JwtPayload, @Param('accountId') a: string) { return this.svc.mappings(u, a); }
 

@@ -68,7 +68,13 @@ export interface ExternalProduct {
   title: string;
   description?: string;
   brand?: string;
+  brandExternalId?: string;        // yayınlamada kanal marka kimliği
+  groupId?: string;                // varyant gruplama (Trendyol productMainId)
   categoryExternalId?: string;
+  vatRate?: number;
+  weightGrams?: number;
+  originCountryCode?: string;      // ISO-2
+  channelAttributes?: { attributeId: string; valueId?: string; customValue?: string }[];
   price?: number;
   salePrice?: number;
   stock?: number;
@@ -136,6 +142,23 @@ export interface PushResult {
   error?: string;
 }
 
+export interface BatchStatus {
+  done: boolean;
+  items: { externalId: string; ok: boolean; errors: string[] }[];
+  raw?: unknown;
+}
+
+export interface ExternalBrand { externalId: string; name: string }
+
+export interface ChannelAttributeDef {
+  id: string;
+  name: string;
+  required: boolean;
+  allowCustom: boolean;
+  varianter: boolean;
+  values?: { id: string; name: string }[]; // satır içi geliyorsa
+}
+
 export interface PagedResult<T> {
   items: T[];
   nextCursor?: string;
@@ -155,7 +178,12 @@ export interface ChannelAdapter {
   testConnection(ctx: AdapterContext): Promise<{ ok: boolean; message: string }>;
 
   fetchCategories?(ctx: AdapterContext): Promise<ExternalCategory[]>;
-  fetchCategoryAttributes?(ctx: AdapterContext, categoryExternalId: string): Promise<unknown>;
+  /** Kategori özellik tanımlarını normalize eder (zorunlu/özel değer/varyant). */
+  fetchCategoryAttributes?(ctx: AdapterContext, categoryExternalId: string): Promise<ChannelAttributeDef[]>;
+  fetchAttributeValues?(ctx: AdapterContext, categoryExternalId: string, attributeId: string): Promise<{ id: string; name: string }[]>;
+  findBrands?(ctx: AdapterContext, name: string): Promise<ExternalBrand[]>;
+  /** Asenkron toplu işlemin sonucunu sorgular. */
+  checkBatch?(ctx: AdapterContext, batchRequestId: string): Promise<BatchStatus>;
 
   fetchProducts?(ctx: AdapterContext, cursor?: string): Promise<PagedResult<ExternalProduct>>;
   createProducts?(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]>;

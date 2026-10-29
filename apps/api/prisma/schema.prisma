@@ -175,6 +175,7 @@ model ChannelAccount {
   reviews          ProductReview[]
   categoryMappings CategoryMapping[]
   channelCategories ChannelCategory[]
+  channelBrands    ChannelBrand[]
   pricingRules     PricingRule[]
   stockPolicies    ChannelStockPolicy[]
 
@@ -379,6 +380,8 @@ model Listing {
   lastError        String?
   rawSnapshot      Json?         // içe aktarmada kanaldan gelen ham veri
   lastSyncedAt     DateTime?
+  batchRequestId   String?       // kanala gönderilen toplu işlemin kimliği (sonuç takibi)
+  publishedAt      DateTime?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -390,6 +393,21 @@ model Listing {
   @@unique([channelAccountId, externalId])
   @@unique([channelAccountId, variantId])
   @@index([status])
+  @@index([batchRequestId])
+}
+
+/// Kanal marka kataloğu önbelleği (yayınlamada marka kimliği için)
+model ChannelBrand {
+  id               String   @id @default(uuid())
+  channelAccountId String
+  externalId       String
+  name             String
+  fetchedAt        DateTime @default(now())
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([channelAccountId, externalId])
+  @@index([channelAccountId, name])
 }
 
 /// İçe aktarılan ilan için merkezi ürün eşleştirme önerisi (otomatik birleştirme yapılmaz)
@@ -416,6 +434,7 @@ enum SyncJobType {
   QUESTION_PULL
   REVIEW_PULL
   ADS_PULL
+  BATCH_CHECK
 }
 
 enum SyncJobStatus {

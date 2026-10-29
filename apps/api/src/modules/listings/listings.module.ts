@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ListingsController } from './listings.controller';
 import { ListingsService } from './listings.service';
+import { PublishService } from './publish.service';
+import { ChannelsModule } from '../channels/channels.module';
 
-@Module({ controllers: [ListingsController], providers: [ListingsService], exports: [ListingsService] })
+@Module({ imports: [ChannelsModule], controllers: [ListingsController], providers: [ListingsService, PublishService], exports: [ListingsService, PublishService] })
 export class ListingsModule {}

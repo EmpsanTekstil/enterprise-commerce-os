@@ -27,13 +27,22 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run prisma:generate -w @eco/api
       # Migration dosyası yoksa şemadan üret (ilk kurulum); varsa mevcut olanları uygula
-      - name: Migration üret (yoksa)
+      # Şema değiştiyse yeni migration dosyası üret (shadow veritabanı ile mevcut migration'lardan fark alınır)
+      - name: Migration üret (şema değiştiyse)
         working-directory: apps/api
         run: |
           if [ ! -d prisma/migrations ]; then
             mkdir -p prisma/migrations/0_init
             npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
             printf 'provider = "postgresql"\n' > prisma/migrations/migration_lock.toml
+          else
+            PGPASSWORD=eco psql -h localhost -U eco -d postgres -c 'DROP DATABASE IF EXISTS eco_shadow;' -c 'CREATE DATABASE eco_shadow;'
+            npx prisma migrate diff --from-migrations prisma/migrations --shadow-database-url postgresql://eco:eco@localhost:5432/eco_shadow --to-schema-datamodel prisma/schema.prisma --script > /tmp/diff.sql
+            if grep -qE '^(CREATE|ALTER|DROP)' /tmp/diff.sql; then
+              NAME="$(date -u +%Y%m%d%H%M%S)_auto"
+              mkdir -p "prisma/migrations/$NAME" && cp /tmp/diff.sql "prisma/migrations/$NAME/migration.sql"
+              echo "Yeni migration: $NAME"; cat /tmp/diff.sql
+            fi
           fi
       - run: npm run prisma:deploy -w @eco/api
       - run: npm run db:seed

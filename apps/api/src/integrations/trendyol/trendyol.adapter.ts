@@ -1,6 +1,6 @@
 import {
-  AdapterContext, CapabilityMatrix, ChannelAdapter, ExternalCategory, ExternalOrder, ExternalProduct,
-  ExternalQuestion, PagedResult, PushResult, UnsupportedOperationError,
+  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalCategory, ExternalOrder,
+  ExternalProduct, ExternalQuestion, PagedResult, PushResult, UnsupportedOperationError,
 } from '../adapter.interface';
 import { HttpError, httpRequest } from '../http-client';
 
@@ -21,7 +21,7 @@ export class TrendyolAdapter implements ChannelAdapter {
 
   readonly capabilities: CapabilityMatrix = {
     'products.read':   { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Onaylı/onaysız ürün filtreleme V2' },
-    'products.create': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/product-create-v2', note: 'Faz 4 — POST .../sellers/{id}/v2/products' },
+    'products.create': { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-create-v2', note: 'POST .../sellers/{id}/v2/products, asenkron batch' },
     'products.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Faz 4 — content/variant/delivery bulk-update' },
     'stock.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'price-and-inventory, asenkron batch' },
     'price.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Barkod başına 30 istek/dk' },
@@ -88,8 +88,70 @@ export class TrendyolAdapter implements ChannelAdapter {
     return out;
   }
 
-  async fetchCategoryAttributes(ctx: AdapterContext, categoryExternalId: string) {
-    return httpRequest({ method: 'GET', url: `${this.baseUrl}/product/categories/${categoryExternalId}/attributes`, headers: this.headers(ctx) });
+  async fetchCategoryAttributes(ctx: AdapterContext, categoryExternalId: string): Promise<ChannelAttributeDef[]> {
+    interface A { attribute: { id: number; name: string }; required: boolean; allowCustom: boolean; varianter: boolean; slicer?: boolean; attributeValues?: { id: number; name: string }[] }
+    const r = await httpRequest<{ categoryAttributes: A[] }>({ method: 'GET', url: `${this.baseUrl}/product/categories/${categoryExternalId}/attributes`, headers: this.headers(ctx) });
+    return (r.categoryAttributes ?? []).map((a) => ({
+      id: String(a.attribute.id), name: a.attribute.name, required: !!a.required, allowCustom: !!a.allowCustom, varianter: !!a.varianter,
+      values: a.attributeValues?.map((v) => ({ id: String(v.id), name: v.name })),
+    }));
+  }
+
+  async fetchAttributeValues(ctx: AdapterContext, categoryExternalId: string, attributeId: string) {
+    const r = await httpRequest<{ attributeValues?: { id: number; name: string }[]; content?: { id: number; name: string }[] }>({
+      method: 'GET', url: `${this.baseUrl}/product/categories/${categoryExternalId}/attributes/${attributeId}/values`, headers: this.headers(ctx),
+    });
+    return (r.attributeValues ?? r.content ?? []).map((v) => ({ id: String(v.id), name: v.name }));
+  }
+
+  async findBrands(ctx: AdapterContext, name: string): Promise<ExternalBrand[]> {
+    const r = await httpRequest<{ id: number; name: string }[] | { brands?: { id: number; name: string }[] }>({
+      method: 'GET', url: `${this.baseUrl}/product/brands/by-name?name=${encodeURIComponent(name)}`, headers: this.headers(ctx),
+    });
+    const list = Array.isArray(r) ? r : r.brands ?? [];
+    return list.map((b) => ({ externalId: String(b.id), name: b.name }));
+  }
+
+  /** Product Create v2 — asenkron; sonuç checkBatch ile sorgulanır. */
+  async createProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    const items = products.map((p) => ({
+      barcode: p.barcode ?? p.externalId,
+      title: (p.title ?? '').slice(0, 100),
+      productMainId: (p.groupId ?? p.barcode ?? p.externalId).slice(0, 40),
+      brandId: Number(p.brandExternalId),
+      categoryId: Number(p.categoryExternalId),
+      quantity: p.stock ?? 0,
+      stockCode: p.sku?.slice(0, 100),
+      dimensionalWeight: p.weightGrams ? Math.max(1, Math.ceil(p.weightGrams / 1000)) : 1,
+      description: (p.description ?? p.title ?? '').slice(0, 30000),
+      listPrice: p.price ?? p.salePrice ?? 0,
+      salePrice: p.salePrice ?? p.price ?? 0,
+      vatRate: Math.round(p.vatRate ?? 20),
+      ...(p.originCountryCode ? { origin: p.originCountryCode } : {}),
+      images: (p.images ?? []).slice(0, 8).map((url) => ({ url })),
+      attributes: (p.channelAttributes ?? []).map((a) => ({
+        attributeId: Number(a.attributeId),
+        ...(a.valueId ? { attributeValueId: Number(a.valueId) } : {}),
+        ...(a.customValue ? { customAttributeValue: a.customValue } : {}),
+      })),
+    }));
+    try {
+      const r = await httpRequest<{ batchRequestId: string }>({ method: 'POST', url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/v2/products`, headers: this.headers(ctx), body: { items } });
+      return items.map((i) => ({ ok: true, externalId: i.barcode, batchRequestId: r.batchRequestId }));
+    } catch (e) {
+      return items.map((i) => ({ ok: false, externalId: i.barcode, error: (e as Error).message }));
+    }
+  }
+
+  async checkBatch(ctx: AdapterContext, batchRequestId: string): Promise<BatchStatus> {
+    interface R { status?: string; itemCount?: number; failedItemCount?: number; items?: { requestItem?: { barcode?: string }; status?: string; failureReasons?: string[] }[] }
+    const r = await httpRequest<R>({ method: 'GET', url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products/batch-requests/${batchRequestId}`, headers: this.headers(ctx) });
+    const done = (r.status ?? '').toUpperCase() !== 'IN_PROGRESS';
+    return {
+      done,
+      items: (r.items ?? []).map((i) => ({ externalId: i.requestItem?.barcode ?? '', ok: (i.status ?? '').toUpperCase() === 'SUCCESS', errors: i.failureReasons ?? [] })),
+      raw: r,
+    };
   }
 
   async fetchProducts(ctx: AdapterContext, cursor?: string): Promise<PagedResult<ExternalProduct>> {
@@ -210,7 +272,6 @@ export class TrendyolAdapter implements ChannelAdapter {
   }
 
   // Henüz kodlanmayanlar: sahte başarı yerine açık hata.
-  async createProducts(): Promise<PushResult[]> { throw new UnsupportedOperationError(this.displayName, 'products.create'); }
   async updateProducts(): Promise<PushResult[]> { throw new UnsupportedOperationError(this.displayName, 'products.update'); }
   async updateShipment(): Promise<PushResult> { throw new UnsupportedOperationError(this.displayName, 'shipping.update'); }
 }
