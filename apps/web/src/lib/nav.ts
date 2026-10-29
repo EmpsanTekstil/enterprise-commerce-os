@@ -10,7 +10,7 @@ export const NAV: NavItem[] = [
   { href: '/', label: 'Genel Bakış', icon: LayoutDashboard, ready: true, group: 'Ana' },
   { href: '/urunler', label: 'Ürün Yönetimi', icon: Package, ready: true, group: 'Katalog' },
   { href: '/urunler/yeni', label: 'Ürün Oluştur', icon: PackagePlus, ready: true, group: 'Katalog' },
-  { href: '/toplu-islemler', label: 'Toplu Ürün İşlemleri', icon: Layers, group: 'Katalog' },
+  { href: '/toplu-islemler', label: 'Toplu Ürün İşlemleri', icon: Layers, ready: true, group: 'Katalog' },
   { href: '/yayinlar', label: 'Pazaryeri Yayınları', icon: Store, ready: true, group: 'Katalog' },
   { href: '/siparisler', label: 'Siparişler', icon: ShoppingCart, ready: true, group: 'Operasyon' },
   { href: '/stok', label: 'Stok ve Depolar', icon: Warehouse, group: 'Operasyon' },
