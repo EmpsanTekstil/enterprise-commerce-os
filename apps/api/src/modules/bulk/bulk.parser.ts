@@ -12,7 +12,11 @@ function normalizeHeader(h: string) {
 
 /** Excel (.xlsx) veya CSV dosyasını satırlara çevirir ve sütun tanımlarına göre doğrular. */
 export function parseSheet(buffer: Buffer, columns: readonly ColumnDef[]): { rows: ParsedRow[]; unknownColumns: string[] } {
-  const wb = XLSX.read(buffer, { type: 'buffer', raw: false, codepage: 65001 });
+  // xlsx dosyaları ZIP ('PK') ile başlar; aksi hâlde metin (CSV) kabul edip UTF-8 olarak kendimiz çözeriz (Türkçe karakter güvenliği)
+  const isZip = buffer.length > 1 && buffer[0] === 0x50 && buffer[1] === 0x4b;
+  const wb = isZip
+    ? XLSX.read(buffer, { type: 'buffer', raw: false })
+    : XLSX.read(buffer.toString('utf8').replace(/^\ufeff/, ''), { type: 'string', raw: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   if (!ws) return { rows: [], unknownColumns: [] };
   const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: null, raw: false });
