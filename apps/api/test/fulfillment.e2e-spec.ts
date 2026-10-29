@@ -71,7 +71,14 @@ describe('Paketleme, webhook ve stok (e2e)', () => {
     await post('/listings/accept-suggestions', { accountId });
     const rec = await get('/inventory/reconciliation').expect(200);
     expect(typeof rec.body.mismatches).toBe('number');
-    const item = rec.body.items.find((i: { sku: string }) => i.sku === 'DEMO-TS-S');
-    if (item) expect(item.expected).toBeLessThanOrEqual(item.channelStock ?? 1e9);
+    // Beklenen kanal stoğu = floor((satılabilir − tampon) × pay%)
+    const p = (await get('/products?q=DEMO-TS-S')).body.items[0];
+    const v = (await get(`/products/${p.id}`)).body.variants.find((x: { sku: string }) => x.sku === 'DEMO-TS-S');
+    const available = v.balances.reduce((s: number, b: { onHand: number; reserved: number }) => s + b.onHand - b.reserved, 0);
+    const expected = Math.floor(Math.max(0, available - 1) * 0.5);
+    const item = rec.body.items.find((i: { sku: string; channel: string }) => i.sku === 'DEMO-TS-S' && i.channel.includes('Paket Test'));
+    expect(item).toBeDefined();
+    expect(item.expected).toBe(expected);
+    expect(item.channelStock).toBe(10); // mock kanalın bildirdiği stok
   });
 });
