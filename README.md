@@ -87,5 +87,6 @@ infra/     Dockerfile'lar
 - [x] Faz 3 (kısmi) — Ürün listesi, ürün oluşturma, varyantlar, yayın hazırlık kontrolü
 - [x] Entegrasyonlar ekranı — hesap ekleme, şifreli saklama, bağlantı testi
 - [x] Faz 4 (çekirdek) — Senkron motoru (BullMQ veya inline), kanal ürünlerini içe aktarma + barkod/SKU eşleştirme önerileri, sipariş senkronu + çift düşümsüz stok, iptal/iadede stok iadesi, stok/fiyat gönderme, Yayınlar ve Siparişler ekranları, CSV dışa aktarma
-- [ ] Faz 3 devam — görsel yükleme, kategori ağacı eşleştirme, Excel ile toplu ürün yükleme
+- [x] Faz 3 devam — görsel yükleme (sürükle-bırak, sıralama, otomatik küçültme, S3/yerel), kategori ağacı, kanal kategori eşleştirme
+- [ ] Faz 3 son — Excel/CSV ile toplu ürün yükleme, toplu fiyat/stok
 - [ ] Faz 4 devam — Trendyol'a yeni ürün yayınlama (create v2), kargo takip güncelleme, webhook alıcı

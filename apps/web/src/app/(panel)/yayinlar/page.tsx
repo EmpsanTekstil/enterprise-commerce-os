@@ -1,6 +1,7 @@
 'use client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { CategoryMapping } from '@/components/category-mapping';
 import { Badge, Empty, ErrorBox } from '@/components/ui';
 import { api, fmtTRY } from '@/lib/api';
 
@@ -63,6 +64,10 @@ export default function ListingsPage() {
       )}
       {accountId && !connected.some((a) => a.id === accountId) && <div className="card text-sm text-amber-700">Bu hesap bağlı değil. Entegrasyonlar sayfasından "Bağlantıyı test et" ile bağlayın.</div>}
       {err && <ErrorBox message={err.message} />}
+
+      {accountId && connected.some((a) => a.id === accountId) && (
+        <details className="card"><summary className="cursor-pointer font-medium">Kategori eşleştirme</summary><div className="mt-3"><CategoryMapping accountId={accountId} /></div></details>
+      )}
 
       {listings.data?.items.length === 0 && <Empty title="İlan yok" hint="Bir kanal hesabı seçip 'Ürünleri içe aktar' ile başlayın." />}
       {listings.data && listings.data.items.length > 0 && (

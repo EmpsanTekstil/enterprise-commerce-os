@@ -2,6 +2,7 @@
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { CategoryPicker } from '@/components/category-picker';
 import { ErrorBox } from '@/components/ui';
 import { api } from '@/lib/api';
 
@@ -12,6 +13,7 @@ const num = (s: string) => (s.trim() === '' ? undefined : Number(s));
 export default function NewProductPage() {
   const router = useRouter();
   const [f, setF] = useState({ name: '', brand: '', model: '', description: '', shortDescription: '', packageContent: '', warrantyMonths: '', originCountry: 'Türkiye', vatRate: '20', status: 'DRAFT' });
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [specs, setSpecs] = useState<{ k: string; v: string }[]>([{ k: '', v: '' }]);
   const [variants, setVariants] = useState<VariantForm[]>([emptyVariant()]);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -21,7 +23,7 @@ export default function NewProductPage() {
     mutationFn: () => api<{ id: string }>('/products', {
       method: 'POST',
       body: JSON.stringify({
-        name: f.name, brand: f.brand || undefined, model: f.model || undefined, description: f.description || undefined,
+        name: f.name, categoryId: categoryId ?? undefined, brand: f.brand || undefined, model: f.model || undefined, description: f.description || undefined,
         shortDescription: f.shortDescription || undefined, packageContent: f.packageContent || undefined,
         warrantyMonths: num(f.warrantyMonths), originCountry: f.originCountry || undefined, vatRate: num(f.vatRate), status: f.status,
         specs: Object.fromEntries(specs.filter((s) => s.k.trim()).map((s) => [s.k.trim(), s.v])),
@@ -42,6 +44,7 @@ export default function NewProductPage() {
           <div className="md:col-span-2"><label className="label">Ürün adı *</label><input className="input" required value={f.name} onChange={set('name')} /></div>
           <div><label className="label">Marka</label><input className="input" value={f.brand} onChange={set('brand')} /></div>
           <div><label className="label">Model</label><input className="input" value={f.model} onChange={set('model')} /></div>
+          <div className="md:col-span-2"><label className="label">Kategori</label><CategoryPicker value={categoryId} onChange={setCategoryId} /></div>
           <div className="md:col-span-2"><label className="label">Kısa açıklama</label><input className="input" maxLength={500} value={f.shortDescription} onChange={set('shortDescription')} /></div>
           <div className="md:col-span-2"><label className="label">Ürün açıklaması</label><textarea className="input min-h-[120px]" value={f.description} onChange={set('description')} /></div>
           <div><label className="label">Paket içeriği</label><input className="input" value={f.packageContent} onChange={set('packageContent')} /></div>
@@ -84,7 +87,7 @@ export default function NewProductPage() {
         ))}
       </section>
 
-      <section className="card text-sm text-slate-500">Ürün görselleri ve pazaryerine özel bilgiler, ürün kaydedildikten sonra ürün detay sayfasından eklenir (Faz 3).</section>
+      <section className="card text-sm text-slate-500">Ürün görselleri, kaydettikten sonra açılan ürün detay sayfasından yüklenir.</section>
 
       {m.error && <ErrorBox message={(m.error as Error).message} />}
       <div className="flex gap-2"><button className="btn-primary" disabled={m.isPending}>{m.isPending ? 'Kaydediliyor…' : 'Ürünü Kaydet'}</button><button type="button" className="btn-secondary" onClick={() => router.back()}>Vazgeç</button></div>

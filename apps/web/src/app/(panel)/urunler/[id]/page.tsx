@@ -1,18 +1,22 @@
 'use client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
+import { CategoryPicker } from '@/components/category-picker';
+import { ImageGallery } from '@/components/image-gallery';
 import { Badge, ErrorBox } from '@/components/ui';
 import { api, fmtTRY } from '@/lib/api';
 
 interface Product {
   id: string; name: string; brand: string | null; model: string | null; status: string; description: string | null; shortDescription: string | null;
   specsJson: Record<string, string>; vatRate: string; packageContent: string | null; warrantyMonths: number | null; originCountry: string | null;
-  category: { name: string; path: string } | null; images: { id: string; url: string }[];
+  categoryId: string | null; category: { name: string; path: string } | null; images: { id: string; url: string; width: number | null; height: number | null; sortOrder: number; altText: string | null }[];
   variants: { id: string; sku: string; barcode: string | null; color: string | null; size: string | null; costPrice: string | null; listPrice: string | null; balances: { onHand: number; reserved: number; warehouse: { name: string } }[]; listings: { id: string; status: string; channelAccount: { label: string; channel: { name: string } } }[] }[];
 }
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+  const setCategory = useMutation({ mutationFn: (categoryId: string | null) => api(`/products/${id}`, { method: 'PATCH', body: JSON.stringify({ categoryId }) }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['product', id] }); qc.invalidateQueries({ queryKey: ['readiness', id] }); } });
   const q = useQuery({ queryKey: ['product', id], queryFn: () => api<Product>(`/products/${id}`) });
   const r = useQuery({ queryKey: ['readiness', id], queryFn: () => api<{ ready: boolean; missing: string[] }>(`/products/${id}/readiness`) });
   if (q.error) return <ErrorBox message={(q.error as Error).message} />;
@@ -49,9 +53,14 @@ export default function ProductDetailPage() {
         <section className="card text-sm space-y-1">
           <div className="font-medium">Bilgiler</div>
           <div>KDV: %{p.vatRate}</div><div>Garanti: {p.warrantyMonths ?? '—'} ay</div><div>Menşei: {p.originCountry ?? '—'}</div><div>Paket içeriği: {p.packageContent ?? '—'}</div>
-          <div>Görsel: {p.images.length} adet</div>
+          <div className="pt-1"><div className="label">Kategori</div><CategoryPicker value={p.categoryId} onChange={(c) => setCategory.mutate(c)} /></div>
         </section>
       </div>
+
+      <section className="card space-y-2">
+        <div className="font-medium">Ürün görselleri ({p.images.length})</div>
+        <ImageGallery productId={p.id} images={p.images} />
+      </section>
 
       <section className="card overflow-x-auto !p-0">
         <table className="w-full text-sm">
