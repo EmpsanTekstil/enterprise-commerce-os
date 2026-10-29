@@ -10,8 +10,9 @@ Belgeler: [PRD](docs/01-PRD.md) · [Mimari](docs/02-MIMARI.md) · [ER Diyagramı
 
 Gerekenler: **Node.js 22+** (https://nodejs.org), **Docker Desktop** (https://www.docker.com/products/docker-desktop/), **Git**.
 
-### 1. Projeyi aç ve ortam dosyasını oluştur
+### 1. Projeyi indir ve ortam dosyasını oluştur
 ```bash
+git clone https://github.com/EmpsanTekstil/enterprise-commerce-os.git
 cd enterprise-commerce-os
 cp .env.example .env
 ```
@@ -32,7 +33,7 @@ docker compose up -d postgres redis minio
 ```bash
 npm install
 npm run prisma:generate -w @eco/api
-npm run db:migrate -- --name init
+npm run prisma:deploy -w @eco/api
 ADMIN_EMAIL=sen@ornek.com ADMIN_PASSWORD=GucluBirSifre123 ORG_NAME="Mağazam" npm run db:seed
 ```
 Windows PowerShell'de ortam değişkenlerini şöyle ver:
@@ -81,6 +82,7 @@ infra/     Dockerfile'lar
 
 ## Geliştirme durumu
 - [x] Faz 1 — Gereksinim, mimari, veritabanı şeması, yetenek matrisi
+- [x] CI (GitHub Actions): kurulum, migration, seed, tip kontrolü, birim + uçtan uca testler, derleme — her push'ta otomatik
 - [x] Faz 2 (kısmi) — Giriş, rol/yetki, Genel Bakış (gerçek verilerle)
 - [x] Faz 3 (kısmi) — Ürün listesi, ürün oluşturma, varyantlar, yayın hazırlık kontrolü
 - [x] Entegrasyonlar ekranı — hesap ekleme, şifreli saklama, bağlantı testi
