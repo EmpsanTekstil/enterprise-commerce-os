@@ -1,0 +1,976 @@
+// ============================================================
+// ENTERPRISE COMMERCE OS — Veritabanı Şeması (PostgreSQL / Prisma)
+// Tasarım ilkeleri:
+//  - Çok kiracılı (Organization) yapı: her kayıt bir organizasyona aittir.
+//  - Kanal-bağımsız model: SalesChannel = kanal türü (Trendyol, Shopify...),
+//    ChannelAccount = bağlı hesap (aynı kanalda birden fazla mağaza olabilir).
+//  - Merkezi ürün (Product/ProductVariant) ile kanal ilanı (Listing) ayrıdır.
+//  - Tüm dış kimlikler (externalId) hesap bazında benzersizdir -> idempotentlik.
+//  - Para alanları Decimal(14,2); miktarlar Int.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------
+// ORGANİZASYON, KULLANICI, ROL, YETKİ
+// ------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  isDemo    Boolean  @default(false) // Demo verisi gerçek veriden ayrılır
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  roles            Role[]
+  channelAccounts  ChannelAccount[]
+  products         Product[]
+  categories       Category[]
+  warehouses       Warehouse[]
+  orders           Order[]
+  campaigns        AdvertisingCampaign[]
+  questions        CustomerQuestion[]
+  reviews          ProductReview[]
+  aiRequests       AIRequest[]
+  automationRules  AutomationRule[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  images           ProductImage[]
+  pricingRules     PricingRule[]
+  replyTemplates   ReplyTemplate[]
+  dashboardLayouts DashboardLayout[]
+}
+
+model User {
+  id             String    @id @default(uuid())
+  organizationId String
+  email          String
+  passwordHash   String
+  fullName       String
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles        UserRole[]
+  assignedQuestions CustomerQuestion[] @relation("AssignedQuestions")
+  questionResponses QuestionResponse[]
+  reviewResponses   ReviewResponse[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  aiRequests        AIRequest[]
+  dashboardLayouts  DashboardLayout[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+}
+
+model Role {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String   // Yönetici, Ürün Yöneticisi, Sipariş Personeli...
+  key            String   // admin, product_manager, order_staff, ads_manager, support, finance
+  isSystem       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([organizationId, key])
+}
+
+model Permission {
+  id          String @id @default(uuid())
+  key         String @unique // products.read, products.write, orders.read, ads.write ...
+  description String
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+// ------------------------------------------------------------
+// SATIŞ KANALLARI (pazaryeri, kendi mağaza vb.) VE HESAPLAR
+// ------------------------------------------------------------
+
+enum ChannelKind {
+  MARKETPLACE // Trendyol, Hepsiburada, Amazon, n11, idefix...
+  STOREFRONT  // Shopify, WooCommerce, ikas...
+  OTHER
+}
+
+/// Kanal türü kataloğu. Kod tarafındaki adaptör ile `code` üzerinden eşleşir.
+model SalesChannel {
+  id          String      @id @default(uuid())
+  code        String      @unique // trendyol, hepsiburada, amazon_tr, n11, idefix, shopify ...
+  name        String
+  kind        ChannelKind
+  countryCode String      @default("TR")
+  isEnabled   Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+
+  accounts ChannelAccount[]
+}
+
+enum ConnectionStatus {
+  NOT_CONFIGURED
+  CONNECTED
+  ERROR
+  DISABLED
+}
+
+/// Bağlı hesap: aynı kanalda birden fazla mağaza olabilir.
+model ChannelAccount {
+  id               String           @id @default(uuid())
+  organizationId   String
+  channelId        String
+  label            String           // "Trendyol - Ana Mağaza"
+  externalSellerId String?          // supplierId / merchantId / shop domain
+  credentialsEnc   String           // AES-256-GCM ile şifreli JSON (asla düz metin)
+  settings         Json             @default("{}") // kanal-özel ayarlar (stok politikası vb.)
+  status           ConnectionStatus @default(NOT_CONFIGURED)
+  lastSyncAt       DateTime?
+  lastError        String?
+  isDemo           Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      SalesChannel @relation(fields: [channelId], references: [id])
+
+  listings         Listing[]
+  syncJobs         ListingSyncJob[]
+  orders           Order[]
+  campaigns        AdvertisingCampaign[]
+  questions        CustomerQuestion[]
+  reviews          ProductReview[]
+  categoryMappings CategoryMapping[]
+  channelCategories ChannelCategory[]
+  pricingRules     PricingRule[]
+  stockPolicies    ChannelStockPolicy[]
+
+  @@index([organizationId, channelId])
+}
+
+// ------------------------------------------------------------
+// KATEGORİ VE EŞLEŞTİRME
+// ------------------------------------------------------------
+
+/// Merkezi (iç) kategori ağacı
+model Category {
+  id             String  @id @default(uuid())
+  organizationId String
+  parentId       String?
+  name           String
+  path           String  // "Elektronik > Telefon > Kılıf" (arama için)
+  sortOrder      Int     @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       Category?    @relation("CategoryTree", fields: [parentId], references: [id])
+  children     Category[]   @relation("CategoryTree")
+  products     Product[]
+  mappings     CategoryMapping[]
+
+  @@index([organizationId, parentId])
+}
+
+/// Kanaldan çekilen kategori ağacı (önbellek) ve zorunlu özellikleri
+model ChannelCategory {
+  id               String   @id @default(uuid())
+  channelAccountId String
+  externalId       String
+  parentExternalId String?
+  name             String
+  path             String
+  isLeaf           Boolean  @default(false)
+  attributesJson   Json?    // kanal API'sinden alınan özellik tanımları (zorunlu/opsiyonel)
+  fetchedAt        DateTime @default(now())
+
+  channelAccount ChannelAccount    @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  mappings       CategoryMapping[]
+
+  @@unique([channelAccountId, externalId])
+  @@index([channelAccountId, parentExternalId])
+}
+
+/// İç kategori -> kanal kategorisi eşleştirmesi (+ özellik eşleştirme kuralları)
+model CategoryMapping {
+  id                String   @id @default(uuid())
+  categoryId        String
+  channelAccountId  String
+  channelCategoryId String
+  attributeMapJson  Json     @default("{}") // iç özellik adı -> kanal özellik id/değer eşlemesi
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  channelAccount  ChannelAccount  @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  channelCategory ChannelCategory @relation(fields: [channelCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, channelAccountId])
+}
+
+// ------------------------------------------------------------
+// ÜRÜN (PIM)
+// ------------------------------------------------------------
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Product {
+  id               String        @id @default(uuid())
+  organizationId   String
+  categoryId       String?
+  name             String
+  brand            String?
+  model            String?
+  description      String?       // HTML/markdown
+  shortDescription String?
+  specsJson        Json          @default("{}") // teknik özellikler: {"Malzeme":"Pamuk",...}
+  packageContent   String?
+  warrantyMonths   Int?
+  originCountry    String?
+  vatRate          Decimal       @default(20) @db.Decimal(5, 2)
+  status           ProductStatus @default(DRAFT)
+  isDemo           Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category     Category?          @relation(fields: [categoryId], references: [id])
+  variants     ProductVariant[]
+  attributes   ProductAttribute[]
+  images       ProductImage[]
+  reviews      ProductReview[]
+  questions    CustomerQuestion[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, brand])
+}
+
+/// Satılabilir birim: barkod/SKU burada. Varyantsız ürün tek varyanta sahiptir.
+model ProductVariant {
+  id             String   @id @default(uuid())
+  productId      String
+  sku            String
+  barcode        String?
+  color          String?
+  size           String?
+  dimensions     String?  // "30x20x10 cm"
+  weightGrams    Int?
+  material       String?
+  costPrice      Decimal? @db.Decimal(14, 2) // alış maliyeti (KDV hariç)
+  listPrice      Decimal? @db.Decimal(14, 2) // referans satış fiyatı
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  product    Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributes ProductAttribute[]
+  images     ProductImage[]
+  listings   Listing[]
+  balances   InventoryBalance[]
+  movements  InventoryMovement[]
+  orderItems OrderItem[]
+  adMetrics  AdvertisingMetric[]
+
+  @@unique([productId, sku])
+  @@index([barcode])
+  @@index([sku])
+}
+
+/// Esnek özellik (ürün veya varyant düzeyinde)
+model ProductAttribute {
+  id        String  @id @default(uuid())
+  productId String
+  variantId String?
+  name      String
+  value     String
+  unit      String?
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId, name])
+}
+
+model ProductImage {
+  id             String   @id @default(uuid())
+  organizationId String
+  productId      String?
+  variantId      String?
+  storageKey     String   // S3 nesne anahtarı
+  url            String
+  width          Int?
+  height         Int?
+  sizeBytes      Int?
+  sortOrder      Int      @default(0)
+  altText        String?
+  createdAt      DateTime @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product?        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant      ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+// ------------------------------------------------------------
+// KANAL İLANLARI (LISTING) VE SENKRONİZASYON
+// ------------------------------------------------------------
+
+enum ListingStatus {
+  DRAFT        // yerelde hazırlandı, gönderilmedi
+  PENDING      // kanala gönderildi, onay bekliyor
+  ACTIVE
+  REJECTED
+  PAUSED
+  ERROR
+  UNLINKED     // içe aktarıldı ama merkezi ürünle eşleştirilmedi
+}
+
+/// Bir varyantın belirli bir kanal hesabındaki ilanı. Kanal-özel başlık/açıklama/fiyat burada.
+model Listing {
+  id               String        @id @default(uuid())
+  channelAccountId String
+  variantId        String?       // null => içe aktarıldı, eşleştirme bekliyor
+  externalId       String?       // kanalın ürün/ilan kimliği
+  externalSku      String?
+  title            String?
+  description      String?
+  attributesJson   Json          @default("{}")
+  imageOrder       Json?         // kanal-özel görsel sıralaması [imageId,...]
+  price            Decimal?      @db.Decimal(14, 2)
+  salePrice        Decimal?      @db.Decimal(14, 2)
+  stockQuantity    Int?          // kanalda bilinen son stok
+  status           ListingStatus @default(DRAFT)
+  lastError        String?
+  rawSnapshot      Json?         // içe aktarmada kanaldan gelen ham veri
+  lastSyncedAt     DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  channelAccount ChannelAccount   @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  variant        ProductVariant?  @relation(fields: [variantId], references: [id])
+  syncJobs       ListingSyncJob[]
+  matchSuggestions ListingMatchSuggestion[]
+
+  @@unique([channelAccountId, externalId])
+  @@unique([channelAccountId, variantId])
+  @@index([status])
+}
+
+/// İçe aktarılan ilan için merkezi ürün eşleştirme önerisi (otomatik birleştirme yapılmaz)
+model ListingMatchSuggestion {
+  id         String   @id @default(uuid())
+  listingId  String
+  variantId  String
+  confidence Decimal  @db.Decimal(5, 2) // 0-100
+  reason     String   // "Barkod eşleşti", "SKU eşleşti"
+  createdAt  DateTime @default(now())
+
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, variantId])
+}
+
+enum SyncJobType {
+  PRODUCT_PUSH
+  PRODUCT_PULL
+  STOCK_PUSH
+  PRICE_PUSH
+  ORDER_PULL
+  CATEGORY_PULL
+  QUESTION_PULL
+  REVIEW_PULL
+  ADS_PULL
+}
+
+enum SyncJobStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model ListingSyncJob {
+  id               String        @id @default(uuid())
+  channelAccountId String
+  listingId        String?
+  type             SyncJobType
+  status           SyncJobStatus @default(QUEUED)
+  idempotencyKey   String?       @unique
+  payload          Json?
+  result           Json?
+  error            String?
+  attempts         Int           @default(0)
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime      @default(now())
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  listing        Listing?       @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([channelAccountId, status, createdAt])
+}
+
+// ------------------------------------------------------------
+// STOK VE DEPO
+// ------------------------------------------------------------
+
+model Warehouse {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  code           String
+  address        String?
+  isDefault      Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  balances     InventoryBalance[]
+  movements    InventoryMovement[]
+
+  @@unique([organizationId, code])
+}
+
+/// Depo x Varyant stok bakiyesi. available = onHand - reserved (uygulama katmanında hesaplanır).
+model InventoryBalance {
+  id           String   @id @default(uuid())
+  warehouseId  String
+  variantId    String
+  onHand       Int      @default(0)
+  reserved     Int      @default(0)
+  reorderPoint Int      @default(0) // kritik stok eşiği
+  updatedAt    DateTime @updatedAt
+
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, variantId])
+}
+
+enum MovementType {
+  PURCHASE_IN
+  SALE_OUT
+  RETURN_IN
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RESERVE
+  RELEASE
+}
+
+/// Değiştirilemez hareket defteri. referenceKey ile aynı sipariş iki kez düşülemez.
+model InventoryMovement {
+  id           String       @id @default(uuid())
+  warehouseId  String
+  variantId    String
+  type         MovementType
+  quantity     Int          // +giriş / -çıkış
+  referenceKey String?      // "order:<orderId>:item:<itemId>"
+  note         String?
+  createdById  String?
+  createdAt    DateTime     @default(now())
+
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceKey, type])
+  @@index([variantId, createdAt])
+}
+
+/// Kanal hesabına gönderilecek stok politikası (ör. %80'ini gönder, 2 adet tampon bırak)
+model ChannelStockPolicy {
+  id               String  @id @default(uuid())
+  channelAccountId String  @unique
+  sharePercent     Int     @default(100)
+  bufferQuantity   Int     @default(0)
+  maxQuantity      Int?
+  autoPush         Boolean @default(true)
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------------
+// SİPARİŞ, KARGO, İADE
+// ------------------------------------------------------------
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  PICKING
+  PACKED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+  UNKNOWN
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  organizationId   String
+  channelAccountId String
+  externalId       String      // kanal sipariş/paket numarası
+  orderNumber      String?
+  status           OrderStatus @default(NEW)
+  channelStatus    String?     // kanalın ham durum kodu
+  customerName     String?
+  customerEmail    String?     // maskelenmiş saklanabilir
+  customerPhone    String?
+  shippingAddress  Json?
+  billingAddress   Json?
+  currency         String      @default("TRY")
+  subtotal         Decimal     @default(0) @db.Decimal(14, 2)
+  shippingTotal    Decimal     @default(0) @db.Decimal(14, 2)
+  discountTotal    Decimal     @default(0) @db.Decimal(14, 2)
+  grandTotal       Decimal     @default(0) @db.Decimal(14, 2)
+  commissionTotal  Decimal?    @db.Decimal(14, 2)
+  estimatedProfit  Decimal?    @db.Decimal(14, 2)
+  orderedAt        DateTime
+  rawSnapshot      Json?
+  isDemo           Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+  shipments      Shipment[]
+  returns        Return[]
+  history        OrderStatusHistory[]
+
+  @@unique([channelAccountId, externalId])
+  @@index([organizationId, status, orderedAt])
+  @@index([organizationId, orderedAt])
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  variantId   String?  // eşleşmemişse null
+  externalId  String?
+  sku         String?
+  barcode     String?
+  name        String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(14, 2)
+  vatRate     Decimal? @db.Decimal(5, 2)
+  commission  Decimal? @db.Decimal(14, 2)
+  lineTotal   Decimal  @db.Decimal(14, 2)
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String
+  fromStatus OrderStatus?
+  toStatus  OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+}
+
+enum ShipmentStatus {
+  PENDING
+  LABEL_CREATED
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+  RETURNED
+}
+
+model Shipment {
+  id              String         @id @default(uuid())
+  orderId         String
+  carrierCode     String?        // yurtici, aras, mng, ptt, trendyol_express ...
+  carrierName     String?
+  trackingNumber  String?
+  trackingUrl     String?
+  status          ShipmentStatus @default(PENDING)
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  estimatedDate   DateTime?
+  rawSnapshot     Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([trackingNumber])
+}
+
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  RECEIVED
+  REFUNDED
+  CLOSED
+}
+
+model Return {
+  id              String       @id @default(uuid())
+  orderId         String
+  externalId      String?
+  status          ReturnStatus @default(REQUESTED)
+  reason          String?
+  itemsJson       Json         // [{orderItemId, quantity}]
+  refundAmount    Decimal?     @db.Decimal(14, 2)
+  trackingNumber  String?
+  stockRestored   Boolean      @default(false)
+  requestedAt     DateTime     @default(now())
+  resolvedAt      DateTime?
+  rawSnapshot     Json?
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+}
+
+// ------------------------------------------------------------
+// FİYATLANDIRMA
+// ------------------------------------------------------------
+
+model PricingRule {
+  id               String   @id @default(uuid())
+  organizationId   String
+  channelAccountId String?  // null => tüm kanallar
+  name             String
+  commissionPercent Decimal @default(0) @db.Decimal(5, 2)
+  shippingCost     Decimal @default(0) @db.Decimal(14, 2)
+  packagingCost    Decimal @default(0) @db.Decimal(14, 2)
+  otherCostPercent Decimal @default(0) @db.Decimal(5, 2)
+  targetMarginPercent Decimal @default(20) @db.Decimal(5, 2)
+  minPrice         Decimal? @db.Decimal(14, 2) // güvenli alt limit
+  maxPrice         Decimal? @db.Decimal(14, 2)
+  requireApproval  Boolean  @default(true)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount? @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ------------------------------------------------------------
+// REKLAM
+// ------------------------------------------------------------
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+  DRAFT
+  UNKNOWN
+}
+
+model AdvertisingCampaign {
+  id               String         @id @default(uuid())
+  organizationId   String
+  channelAccountId String
+  externalId       String
+  name             String
+  type             String?        // sponsored_products vb.
+  status           CampaignStatus @default(UNKNOWN)
+  dailyBudget      Decimal?       @db.Decimal(14, 2)
+  totalBudget      Decimal?       @db.Decimal(14, 2)
+  startDate        DateTime?
+  endDate          DateTime?
+  isManagedViaApi  Boolean        @default(false) // API yazma yetkisi var mı?
+  rawSnapshot      Json?
+  lastSyncedAt     DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount      @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  metrics        AdvertisingMetric[]
+
+  @@unique([channelAccountId, externalId])
+}
+
+/// Günlük metrik; ürün bazında kırılım için variantId opsiyonel.
+model AdvertisingMetric {
+  id          String   @id @default(uuid())
+  campaignId  String
+  variantId   String?
+  date        DateTime @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Decimal  @default(0) @db.Decimal(14, 2)
+  orders      Int      @default(0)
+  sales       Decimal  @default(0) @db.Decimal(14, 2)
+
+  campaign AdvertisingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  variant  ProductVariant?     @relation(fields: [variantId], references: [id])
+
+  @@unique([campaignId, variantId, date])
+  @@index([date])
+}
+
+// ------------------------------------------------------------
+// MÜŞTERİ SORULARI VE YORUMLAR
+// ------------------------------------------------------------
+
+enum QuestionStatus {
+  OPEN
+  DRAFTED      // AI veya personel taslağı var, onay bekliyor
+  ANSWERED
+  REJECTED
+  CLOSED
+}
+
+model CustomerQuestion {
+  id               String         @id @default(uuid())
+  organizationId   String
+  channelAccountId String
+  productId        String?
+  externalId       String
+  customerName     String?
+  text             String
+  status           QuestionStatus @default(OPEN)
+  assignedToId     String?
+  askedAt          DateTime
+  dueAt            DateTime?      // yanıt süresi takibi
+  canReplyViaApi   Boolean        @default(false)
+  rawSnapshot      Json?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount     @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  product        Product?           @relation(fields: [productId], references: [id])
+  assignedTo     User?              @relation("AssignedQuestions", fields: [assignedToId], references: [id])
+  responses      QuestionResponse[]
+
+  @@unique([channelAccountId, externalId])
+  @@index([organizationId, status, askedAt])
+}
+
+enum ResponseSource {
+  HUMAN
+  AI_DRAFT
+  TEMPLATE
+}
+
+model QuestionResponse {
+  id          String         @id @default(uuid())
+  questionId  String
+  authorId    String?
+  source      ResponseSource @default(HUMAN)
+  text        String
+  isApproved  Boolean        @default(false)
+  sentAt      DateTime?
+  externalId  String?
+  error       String?
+  createdAt   DateTime       @default(now())
+
+  question CustomerQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  author   User?            @relation(fields: [authorId], references: [id])
+
+  @@index([questionId])
+}
+
+model ReplyTemplate {
+  id             String   @id @default(uuid())
+  organizationId String
+  title          String
+  body           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  UNKNOWN
+}
+
+model ProductReview {
+  id               String    @id @default(uuid())
+  organizationId   String
+  channelAccountId String
+  productId        String?
+  externalId       String
+  rating           Int
+  title            String?
+  text             String?
+  customerName     String?
+  sentiment        Sentiment @default(UNKNOWN)
+  aiCategory       String?   // "kargo", "kalite", "beden" ...
+  canReplyViaApi   Boolean   @default(false)
+  reviewedAt       DateTime
+  rawSnapshot      Json?
+  createdAt        DateTime  @default(now())
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channelAccount ChannelAccount   @relation(fields: [channelAccountId], references: [id], onDelete: Cascade)
+  product        Product?         @relation(fields: [productId], references: [id])
+  responses      ReviewResponse[]
+
+  @@unique([channelAccountId, externalId])
+  @@index([organizationId, rating, reviewedAt])
+}
+
+model ReviewResponse {
+  id         String         @id @default(uuid())
+  reviewId   String
+  authorId   String?
+  source     ResponseSource @default(HUMAN)
+  text       String
+  isApproved Boolean        @default(false)
+  sentAt     DateTime?
+  error      String?
+  createdAt  DateTime       @default(now())
+
+  review ProductReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  author User?         @relation(fields: [authorId], references: [id])
+}
+
+// ------------------------------------------------------------
+// YAPAY ZEKÂ, OTOMASYON, BİLDİRİM, DENETİM
+// ------------------------------------------------------------
+
+model AIRequest {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  feature        String   // title_generate, description_generate, question_draft, review_analyze, ads_analyze ...
+  model          String
+  inputTokens    Int      @default(0)
+  outputTokens   Int      @default(0)
+  costUsd        Decimal  @default(0) @db.Decimal(10, 6)
+  inputSummary   String?
+  outputSummary  String?
+  status         String   @default("SUCCESS")
+  error          String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt])
+}
+
+model AutomationRule {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  trigger        String   // low_stock, new_order, new_question, negative_review, ad_spend_limit, api_disconnected ...
+  conditionJson  Json     @default("{}")
+  actionJson     Json     @default("{}") // {type:"notify", channels:["inapp","email"]}
+  isEnabled      Boolean  @default(true)
+  lastFiredAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, trigger, isEnabled])
+}
+
+enum NotificationLevel {
+  INFO
+  WARNING
+  ERROR
+}
+
+model Notification {
+  id             String            @id @default(uuid())
+  organizationId String
+  userId         String?           // null => tüm organizasyon
+  level          NotificationLevel @default(INFO)
+  title          String
+  body           String?
+  link           String?
+  isRead         Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId, isRead, createdAt])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String?
+  action         String   // product.create, listing.publish, price.update ...
+  entityType     String
+  entityId       String?
+  beforeJson     Json?
+  afterJson      Json?
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
+}
+
+/// Kullanıcının düzenlediği dashboard kart yerleşimi
+model DashboardLayout {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  layoutJson     Json
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+}

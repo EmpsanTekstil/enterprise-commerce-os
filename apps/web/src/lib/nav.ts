@@ -1,0 +1,32 @@
+import {
+  LayoutDashboard, Package, PackagePlus, Layers, Store, ShoppingCart, Warehouse, Truck, Tags,
+  Megaphone, Target, BarChart3, MessageCircleQuestion, Star, Inbox, Sparkles, Landmark, FileBarChart,
+  Workflow, Plug, Users, Settings, type LucideIcon,
+} from 'lucide-react';
+
+export interface NavItem { href: string; label: string; icon: LucideIcon; ready?: boolean; group: string }
+
+export const NAV: NavItem[] = [
+  { href: '/', label: 'Genel Bakış', icon: LayoutDashboard, ready: true, group: 'Ana' },
+  { href: '/urunler', label: 'Ürün Yönetimi', icon: Package, ready: true, group: 'Katalog' },
+  { href: '/urunler/yeni', label: 'Ürün Oluştur', icon: PackagePlus, ready: true, group: 'Katalog' },
+  { href: '/toplu-islemler', label: 'Toplu Ürün İşlemleri', icon: Layers, group: 'Katalog' },
+  { href: '/yayinlar', label: 'Pazaryeri Yayınları', icon: Store, group: 'Katalog' },
+  { href: '/siparisler', label: 'Siparişler', icon: ShoppingCart, group: 'Operasyon' },
+  { href: '/stok', label: 'Stok ve Depolar', icon: Warehouse, group: 'Operasyon' },
+  { href: '/kargo', label: 'Kargo ve İadeler', icon: Truck, group: 'Operasyon' },
+  { href: '/fiyat', label: 'Fiyat Yönetimi', icon: Tags, group: 'Operasyon' },
+  { href: '/reklam', label: 'Reklam Merkezi', icon: Megaphone, group: 'Reklam' },
+  { href: '/reklam/kampanyalar', label: 'Reklam Kampanyaları', icon: Target, group: 'Reklam' },
+  { href: '/reklam/analitik', label: 'Reklam Analitiği', icon: BarChart3, group: 'Reklam' },
+  { href: '/sorular', label: 'Müşteri Soruları', icon: MessageCircleQuestion, group: 'Müşteri' },
+  { href: '/yorumlar', label: 'Ürün Yorumları', icon: Star, group: 'Müşteri' },
+  { href: '/gelen-kutusu', label: 'Birleşik Gelen Kutusu', icon: Inbox, group: 'Müşteri' },
+  { href: '/yapay-zeka', label: 'Yapay Zekâ Stüdyosu', icon: Sparkles, group: 'Analiz' },
+  { href: '/finans', label: 'Finans', icon: Landmark, group: 'Analiz' },
+  { href: '/raporlar', label: 'Raporlar', icon: FileBarChart, group: 'Analiz' },
+  { href: '/otomasyonlar', label: 'Otomasyonlar', icon: Workflow, group: 'Sistem' },
+  { href: '/entegrasyonlar', label: 'Entegrasyonlar', icon: Plug, ready: true, group: 'Sistem' },
+  { href: '/kullanicilar', label: 'Kullanıcılar ve Yetkiler', icon: Users, group: 'Sistem' },
+  { href: '/ayarlar', label: 'Sistem Ayarları', icon: Settings, group: 'Sistem' },
+];
