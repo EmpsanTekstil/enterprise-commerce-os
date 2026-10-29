@@ -16,8 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
+        with: { node-version: 22 }
+      - run: npm install --no-audit --no-fund
+      - uses: actions/upload-artifact@v4
+        with: { name: package-lock, path: package-lock.json }
       - run: npm run prisma:generate -w @eco/api
       - run: npm run prisma:deploy -w @eco/api
       - run: npm run typecheck
