@@ -6,3 +6,4 @@ dist
 coverage
 .turbo
 /apps/api/prisma/*.db
+apps/api/storage

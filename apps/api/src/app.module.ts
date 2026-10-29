@@ -15,6 +15,8 @@ import { AuditModule } from './modules/audit/audit.module';
 import { ListingsModule } from './modules/listings/listings.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { SyncModule } from './modules/sync/sync.module';
+import { MediaModule } from './modules/media/media.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 
 @Module({
   imports: [
@@ -32,6 +34,8 @@ import { SyncModule } from './modules/sync/sync.module';
     ListingsModule,
     OrdersModule,
     SyncModule,
+    MediaModule,
+    CategoriesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
