@@ -13,15 +13,33 @@ jobs:
       DATABASE_URL: postgresql://eco:eco@localhost:5432/eco_test
       JWT_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
       CREDENTIALS_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: Admin123!
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - run: npm install --no-audit --no-fund
-      - uses: actions/upload-artifact@v4
-        with: { name: package-lock, path: package-lock.json }
       - run: npm run prisma:generate -w @eco/api
+      # Migration dosyası yoksa şemadan üret (ilk kurulum); varsa mevcut olanları uygula
+      - name: Migration üret (yoksa)
+        working-directory: apps/api
+        run: |
+          if [ ! -d prisma/migrations ]; then
+            mkdir -p prisma/migrations/0_init
+            npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
+            printf 'provider = "postgresql"\n' > prisma/migrations/migration_lock.toml
+          fi
       - run: npm run prisma:deploy -w @eco/api
+      - run: npm run db:seed
       - run: npm run typecheck
       - run: npm test -w @eco/api
+      - run: npm run test:e2e -w @eco/api
+      - run: npm run build -w @eco/api
       - run: npm run build -w @eco/web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: generated-files
+          path: |
+            package-lock.json
+            apps/api/prisma/migrations
