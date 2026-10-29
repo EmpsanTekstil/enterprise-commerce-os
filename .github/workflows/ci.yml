@@ -38,8 +38,19 @@ jobs:
       - run: npm run prisma:deploy -w @eco/api
       - run: npm run db:seed
       - run: npm run typecheck
-      - run: npm test -w @eco/api
-      - run: npm run test:e2e -w @eco/api
+      - run: npm test -w @eco/api -- --json --outputFile=/tmp/unit.json
+      - run: npm run test:e2e -w @eco/api -- --json --outputFile=/tmp/e2e.json
+      - name: Test özetini commit yorumu olarak yaz
+        if: always()
+        env: { GH_TOKEN: ${{ github.token }} }
+        run: |
+          node -e '
+            const fs=require("fs");const rd=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8"))}catch{return null}};
+            const u=rd("/tmp/unit.json"),e=rd("/tmp/e2e.json");
+            const line=(n,r)=>r?`${n}: ${r.numPassedTests} geçti, ${r.numFailedTests} başarısız`+(r.numFailedTests?"\n"+r.testResults.flatMap(t=>t.assertionResults.filter(a=>a.status==="failed").map(a=>"- "+a.fullName+"\n```\n"+(a.failureMessages||[]).join("\n").slice(0,800)+"\n```")).join("\n"):""):`${n}: çalışmadı`;
+            fs.writeFileSync("/tmp/summary.md","### Test sonuçları\n"+line("Birim",u)+"\n"+line("Uçtan uca",e)+"\n");
+          '
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/summary.md)" >/dev/null || true
       - run: npm run build -w @eco/api
       - run: npm run build -w @eco/web
       # Üretilen migration ve lock dosyalarını depoya geri yaz (yalnızca main, yalnızca değişiklik varsa)
