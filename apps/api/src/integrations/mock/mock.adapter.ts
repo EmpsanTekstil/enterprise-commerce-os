@@ -19,15 +19,16 @@ export class MockAdapter implements ChannelAdapter {
   /** Testler için: batch sonucu (varsayılan: hepsi başarılı; barkodu '...FAIL' ile bitenler başarısız) */
   static batchDone = true;
   static returns: ExternalReturn[] = [];
+  static shipmentUpdates: { id: string; data: unknown }[] = [];
   static returnActions: { id: string; action: string; items: string[] }[] = [];
 
   readonly capabilities: CapabilityMatrix = {
     'products.read': { status: 'supported' }, 'products.create': { status: 'supported' }, 'products.update': { status: 'supported' },
     'stock.update': { status: 'supported' }, 'price.update': { status: 'supported' }, 'orders.read': { status: 'supported' },
-    'shipping.update': { status: 'unsupported' }, 'returns.read': { status: 'supported' }, 'returns.update': { status: 'supported' },
+    'shipping.update': { status: 'supported' }, 'returns.read': { status: 'supported' }, 'returns.update': { status: 'supported' },
     'questions.read': { status: 'unsupported' }, 'questions.answer': { status: 'unsupported' }, 'reviews.read': { status: 'unsupported' },
     'reviews.reply': { status: 'unsupported' }, 'ads.reports': { status: 'unsupported' }, 'ads.create': { status: 'unsupported' },
-    'ads.budget': { status: 'unsupported' }, 'ads.pause': { status: 'unsupported' }, 'categories.read': { status: 'supported' }, webhooks: { status: 'unsupported' },
+    'ads.budget': { status: 'unsupported' }, 'ads.pause': { status: 'unsupported' }, 'categories.read': { status: 'supported' }, webhooks: { status: 'supported' },
   };
 
   async testConnection(ctx: AdapterContext) {
@@ -56,6 +57,8 @@ export class MockAdapter implements ChannelAdapter {
     return { done: MockAdapter.batchDone, items: MockAdapter.created.map((p) => { const b = p.barcode ?? p.externalId; return { externalId: b, ok: !b.endsWith('FAIL'), errors: b.endsWith('FAIL') ? ['Görsel boyutu uygun değil'] : [] }; }) };
   }
 
+  async updateShipment(_c: AdapterContext, id: string, data: unknown): Promise<PushResult> { MockAdapter.shipmentUpdates.push({ id, data }); return { ok: true }; }
+  parseWebhook(payload: unknown): ExternalOrder[] { const b = payload as { orders?: ExternalOrder[] }; return (b.orders ?? []).map((o) => ({ ...o, orderedAt: new Date(o.orderedAt) })); }
   async fetchReturns(): Promise<PagedResult<ExternalReturn>> { return { items: MockAdapter.returns, total: MockAdapter.returns.length }; }
   async approveReturn(_c: AdapterContext, id: string, items: string[]): Promise<PushResult> { MockAdapter.returnActions.push({ id, action: 'approve', items }); return { ok: true }; }
   async rejectReturn(_c: AdapterContext, id: string, items: string[]): Promise<PushResult> { MockAdapter.returnActions.push({ id, action: 'reject', items }); return { ok: true }; }

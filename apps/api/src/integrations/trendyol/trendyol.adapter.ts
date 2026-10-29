@@ -14,6 +14,13 @@ import { HttpError, httpRequest } from '../http-client';
  * Ayrıntı ve doküman bağlantıları: docs/04-KANAL-API-YETENEK-MATRISI.md
  * Burada "status: planned" olan işlemler henüz kodlanmadı; çağrılırsa hata fırlatır.
  */
+interface TyLine { id: number; barcode: string; merchantSku?: string; productName: string; quantity: number; price: number; amount?: number; commission?: number }
+interface TyPackage {
+  id: number; shipmentPackageId?: number; orderNumber: string; status: string; orderDate: number; customerFirstName?: string; customerLastName?: string; customerEmail?: string;
+  shipmentAddress?: Record<string, unknown>; currencyCode?: string; totalPrice?: number; grossAmount?: number;
+  cargoProviderName?: string; cargoTrackingNumber?: number | string; cargoTrackingLink?: string; shipmentPackageStatus?: string; lines: TyLine[];
+}
+
 export class TrendyolAdapter implements ChannelAdapter {
   readonly code = 'trendyol';
   readonly displayName = 'Trendyol';
@@ -26,7 +33,7 @@ export class TrendyolAdapter implements ChannelAdapter {
     'stock.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'price-and-inventory, asenkron batch' },
     'price.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Barkod başına 30 istek/dk' },
     'orders.read':     { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'Order V2, en fazla 2 haftalık aralık' },
-    'shipping.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'updatePackage, changeCargoProvider, sendInvoiceLink' },
+    'shipping.update': { status: 'supported', docUrl: 'https://developers.trendyol.com/reference/updatepackagestatus', note: 'Picking/Invoiced bildirimi; takip no yalnızca kendi kargo anlaşmasında' },
     'returns.read':    { status: 'supported', docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'getClaims' },
     'returns.update':  { status: 'supported', docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'approveClaimLineItems; ret talebi çoğu sebepte dosya ister (panelden)' },
     'questions.read':  { status: 'supported', docUrl: 'https://developers.trendyol.com/reference/getquestionfilter' },
@@ -38,7 +45,7 @@ export class TrendyolAdapter implements ChannelAdapter {
     'ads.budget':      { status: 'unsupported' },
     'ads.pause':       { status: 'unsupported' },
     'categories.read': { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/trendyol-category-list-getcategorytree-1', note: '50 istek/dk' },
-    'webhooks':        { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/webhook-model', note: 'Sipariş paketi olayları; satıcı başına 15 webhook' },
+    'webhooks':        { status: 'supported', docUrl: 'https://developers.trendyol.com/docs/webhook-model', note: 'Alıcı uç nokta hazır; kayıt Partner panelinden (API_KEY yöntemi)' },
   };
 
   private headers(ctx: AdapterContext) {
@@ -211,20 +218,19 @@ export class TrendyolAdapter implements ChannelAdapter {
 
   async fetchOrders(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalOrder>> {
     const page = Number(cursor ?? 0);
-    interface TyLine { id: number; barcode: string; merchantSku?: string; productName: string; quantity: number; price: number; amount?: number; commission?: number }
-    interface TyPackage {
-      id: number; orderNumber: string; status: string; orderDate: number; customerFirstName?: string; customerLastName?: string; customerEmail?: string;
-      shipmentAddress?: Record<string, unknown>; currencyCode?: string; totalPrice?: number; grossAmount?: number;
-      cargoProviderName?: string; cargoTrackingNumber?: number | string; cargoTrackingLink?: string; shipmentPackageStatus?: string; lines: TyLine[];
-    }
     const startDate = Math.max(since.getTime(), Date.now() - 14 * 86_400_000); // Trendyol en fazla 2 haftalık aralık kabul eder
     const r = await httpRequest<{ content: TyPackage[]; totalPages: number; totalElements: number }>({
       method: 'GET',
       url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/v2/orders?startDate=${startDate}&endDate=${Date.now()}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`,
       headers: this.headers(ctx),
     });
-    const items = (r.content ?? []).map<ExternalOrder>((p) => ({
-      externalId: String(p.id),
+    const items = (r.content ?? []).map((p) => this.mapPackage(p));
+    return { items, total: r.totalElements, nextCursor: page + 1 < (r.totalPages ?? 0) ? String(page + 1) : undefined };
+  }
+
+  private mapPackage(p: TyPackage): ExternalOrder {
+    return {
+      externalId: String(p.id ?? p.shipmentPackageId),
       orderNumber: p.orderNumber,
       status: p.shipmentPackageStatus ?? p.status,
       orderedAt: new Date(p.orderDate),
@@ -238,8 +244,7 @@ export class TrendyolAdapter implements ChannelAdapter {
       })),
       shipment: { carrierName: p.cargoProviderName, trackingNumber: p.cargoTrackingNumber ? String(p.cargoTrackingNumber) : undefined, trackingUrl: p.cargoTrackingLink, status: p.shipmentPackageStatus },
       raw: p,
-    }));
-    return { items, total: r.totalElements, nextCursor: page + 1 < (r.totalPages ?? 0) ? String(page + 1) : undefined };
+    };
   }
 
   async fetchReturns(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalReturn>> {
@@ -289,6 +294,28 @@ export class TrendyolAdapter implements ChannelAdapter {
     return list.map((x) => ({ id: String(x.id), name: x.name }));
   }
 
+  async updateShipment(ctx: AdapterContext, packageId: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string }): Promise<PushResult> {
+    try {
+      if (data.trackingNumber) {
+        await httpRequest({ method: 'PUT', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/shipment-packages/${packageId}/update-tracking-number`, headers: this.headers(ctx), body: { trackingNumber: data.trackingNumber } });
+      }
+      if (data.status === 'picking' || data.status === 'invoiced') {
+        await httpRequest({
+          method: 'PUT', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/shipment-packages/${packageId}`, headers: this.headers(ctx),
+          body: { status: data.status === 'picking' ? 'Picking' : 'Invoiced', lines: (data.lines ?? []).map((l) => ({ lineId: Number(l.externalId), quantity: l.quantity })), params: data.invoiceNumber ? { invoiceNumber: data.invoiceNumber } : {} },
+        });
+      }
+      return { ok: true };
+    } catch (e) { return { ok: false, error: (e as Error).message }; }
+  }
+
+  /** Webhook gövdesi getShipmentPackages ile aynı modeldir (zarf: content[] veya tek paket). */
+  parseWebhook(payload: unknown): ExternalOrder[] {
+    const body = payload as { content?: unknown[] } | unknown[] | Record<string, unknown>;
+    const list = Array.isArray(body) ? body : Array.isArray((body as { content?: unknown[] }).content) ? (body as { content: unknown[] }).content : [body];
+    return list.map((p) => this.mapPackage(p as Parameters<TrendyolAdapter['mapPackage']>[0]));
+  }
+
   async fetchQuestions(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalQuestion>> {
     const page = Number(cursor ?? 0);
     interface TyQ { id: number; text: string; status: string; creationDate: number; userName?: string; productMainId?: string; webUrl?: string; answer?: unknown }
@@ -320,5 +347,4 @@ export class TrendyolAdapter implements ChannelAdapter {
 
   // Henüz kodlanmayanlar: sahte başarı yerine açık hata.
   async updateProducts(): Promise<PushResult[]> { throw new UnsupportedOperationError(this.displayName, 'products.update'); }
-  async updateShipment(): Promise<PushResult> { throw new UnsupportedOperationError(this.displayName, 'shipping.update'); }
 }

@@ -19,6 +19,8 @@ import { MediaModule } from './modules/media/media.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { BulkModule } from './modules/bulk/bulk.module';
 import { ReturnsModule } from './modules/returns/returns.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { InventoryModule } from './modules/inventory/inventory.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { ReturnsModule } from './modules/returns/returns.module';
     CategoriesModule,
     BulkModule,
     ReturnsModule,
+    WebhooksModule,
+    InventoryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

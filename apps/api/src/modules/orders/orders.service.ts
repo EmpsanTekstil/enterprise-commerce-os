@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ChannelAccount, OrderStatus, Prisma } from '@prisma/client';
 import { AdapterContext, ChannelAdapter, ExternalOrder, UnsupportedOperationError } from '../../integrations/adapter.interface';
+import { AdapterRegistry } from '../../integrations/adapter.registry';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { JwtPayload } from '../auth/auth.service';
+import { ChannelsService } from '../channels/channels.service';
 
 type Account = ChannelAccount & { channel: { code: string } };
 
@@ -26,7 +29,7 @@ const STOCK_RELEASING: OrderStatus[] = ['CANCELLED'];
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private registry: AdapterRegistry, private channels: ChannelsService, private audit: AuditService) {}
 
   /**
    * Siparişleri çeker ve (channelAccountId, externalId) üzerinden upsert eder.
@@ -51,6 +54,43 @@ export class OrdersService {
       cursor = page.nextCursor;
     } while (cursor && pages < 200);
     return { created, updated, stockOut, stockIn, pages, touchedVariants: [...touchedVariants] };
+  }
+
+  /** Webhook ile gelen paketleri işler (aynı upsert yolu → idempotent). */
+  async ingestWebhook(account: Account, adapter: ChannelAdapter, payload: unknown) {
+    if (!adapter.parseWebhook) throw new UnsupportedOperationError(adapter.displayName, 'webhooks');
+    const orders = adapter.parseWebhook(payload);
+    let created = 0, updated = 0;
+    for (const o of orders) { const r = await this.upsertOrder(account, adapter, o); if (r.created) created++; else updated++; }
+    return { received: orders.length, created, updated };
+  }
+
+  // ---------------- Paketleme iş akışı ----------------
+  /** Toplamaya başlandı / faturalandı bildirimi + yerel durum. */
+  async fulfill(user: JwtPayload, orderId: string, action: 'picking' | 'invoiced', invoiceNumber?: string, trackingNumber?: string) {
+    const o = await this.prisma.order.findFirst({ where: { id: orderId, organizationId: user.organizationId }, include: { items: true, channelAccount: { include: { channel: true } } } });
+    if (!o) throw new NotFoundException('Sipariş bulunamadı');
+    if (['CANCELLED', 'RETURNED', 'SHIPPED', 'DELIVERED'].includes(o.status)) throw new BadRequestException(`Bu durumda işlem yapılamaz: ${o.status}`);
+    if (action === 'invoiced' && !invoiceNumber) throw new BadRequestException('Fatura numarası gerekli');
+    const adapter = this.registry.get(o.channelAccount.channel.code);
+    if (adapter.updateShipment) {
+      const r = await adapter.updateShipment(this.channels.buildContext(o.channelAccount), o.externalId, {
+        status: action, invoiceNumber, trackingNumber, lines: o.items.filter((i) => i.externalId).map((i) => ({ externalId: i.externalId!, quantity: i.quantity })),
+      });
+      if (!r.ok) throw new BadRequestException(`Kanal bildirimi başarısız: ${r.error}`);
+    }
+    const next: OrderStatus = action === 'picking' ? 'PICKING' : 'PACKED';
+    await this.prisma.$transaction([
+      this.prisma.order.update({ where: { id: orderId }, data: { status: next } }),
+      this.prisma.orderStatusHistory.create({ data: { orderId, fromStatus: o.status, toStatus: next, note: action === 'invoiced' ? `Faturalandı: ${invoiceNumber}` : 'Toplama başladı' } }),
+    ]);
+    if (trackingNumber) {
+      const sh = await this.prisma.shipment.findFirst({ where: { orderId } });
+      if (sh) await this.prisma.shipment.update({ where: { id: sh.id }, data: { trackingNumber, status: 'LABEL_CREATED' } });
+      else await this.prisma.shipment.create({ data: { orderId, trackingNumber, status: 'LABEL_CREATED' } });
+    }
+    await this.audit.log(user, `order.${action}`, 'Order', orderId, { status: o.status }, { status: next, invoiceNumber, trackingNumber });
+    return this.get(user, orderId);
   }
 
   private async upsertOrder(account: Account, adapter: ChannelAdapter, o: ExternalOrder) {

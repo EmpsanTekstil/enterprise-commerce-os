@@ -24,6 +24,9 @@ export class ChannelsController {
   @Delete('accounts/:id') @RequirePermissions('integrations.write')
   remove(@CurrentUser() u: JwtPayload, @Param('id') id: string) { return this.svc.deleteAccount(u, id); }
 
+  @Post('accounts/:id/webhook-key') @RequirePermissions('integrations.write')
+  webhookKey(@CurrentUser() u: JwtPayload, @Param('id') id: string) { return this.svc.rotateWebhookKey(u, id); }
+
   @Post('accounts/:id/test') @RequirePermissions('integrations.write')
   test(@CurrentUser() u: JwtPayload, @Param('id') id: string) { return this.svc.testConnection(u, id); }
 }

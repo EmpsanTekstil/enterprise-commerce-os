@@ -207,7 +207,10 @@ export interface ChannelAdapter {
   ): Promise<PushResult[]>;
 
   fetchOrders?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalOrder>>;
-  updateShipment?(ctx: AdapterContext, orderExternalId: string, data: { trackingNumber?: string; carrierCode?: string; status?: string }): Promise<PushResult>;
+  /** Paket durumu / kargo bildirimi. status: 'picking' | 'invoiced' | 'shipped'; lines: paket kalemleri (kanal kalem kimliği + adet). */
+  updateShipment?(ctx: AdapterContext, orderExternalId: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string; carrierCode?: string }): Promise<PushResult>;
+  /** Kanalın webhook ile gönderdiği gövdeyi normalize siparişlere çevirir. */
+  parseWebhook?(payload: unknown): ExternalOrder[];
 
   fetchReturns?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalReturn>>;
   approveReturn?(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[]): Promise<PushResult>;

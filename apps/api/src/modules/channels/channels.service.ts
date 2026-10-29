@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CryptoService } from '../../common/crypto.service';
+import { newWebhookKey, sha256 } from '../../common/webhook-key';
 import { AdapterContext } from '../../integrations/adapter.interface';
 import { AdapterRegistry } from '../../integrations/adapter.registry';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -105,6 +106,17 @@ export class ChannelsService {
       credentials: this.crypto.decryptJson<Record<string, string>>(account.credentialsEnc),
       settings: (account.settings as Record<string, unknown>) ?? {},
     };
+  }
+
+  /** Webhook anahtarı üretir; düz anahtar yalnızca bu yanıtta görünür, veritabanında SHA-256 özeti tutulur. */
+  async rotateWebhookKey(user: JwtPayload, id: string) {
+    const account = await this.getOwned(user, id);
+    const key = newWebhookKey();
+    const settings = { ...((account.settings as Record<string, unknown>) ?? {}), webhookKeyHash: sha256(key) };
+    await this.prisma.channelAccount.update({ where: { id }, data: { settings: settings as Prisma.InputJsonValue } });
+    await this.audit.log(user, 'channel_account.webhook_key', 'ChannelAccount', id);
+    const base = (process.env.PUBLIC_API_URL ?? `http://localhost:${process.env.API_PORT ?? 4000}`).replace(/\/$/, '');
+    return { url: `${base}/api/v1/webhooks/${account.channel.code}/${id}`, header: 'x-api-key', key, note: 'Bu anahtar bir daha gösterilmez. Kanal panelinde webhook kaydı yaparken URL ve anahtarı girin (Trendyol: API_KEY yöntemi).' };
   }
 
   async getOwned(user: JwtPayload, id: string) {
