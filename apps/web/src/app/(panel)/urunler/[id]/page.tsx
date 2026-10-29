@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import { CategoryPicker } from '@/components/category-picker';
 import { ImageGallery } from '@/components/image-gallery';
+import { PublishPanel } from '@/components/publish-panel';
 import { Badge, ErrorBox } from '@/components/ui';
 import { api, fmtTRY } from '@/lib/api';
 
@@ -10,7 +11,7 @@ interface Product {
   id: string; name: string; brand: string | null; model: string | null; status: string; description: string | null; shortDescription: string | null;
   specsJson: Record<string, string>; vatRate: string; packageContent: string | null; warrantyMonths: number | null; originCountry: string | null;
   categoryId: string | null; category: { name: string; path: string } | null; images: { id: string; url: string; width: number | null; height: number | null; sortOrder: number; altText: string | null }[];
-  variants: { id: string; sku: string; barcode: string | null; color: string | null; size: string | null; costPrice: string | null; listPrice: string | null; balances: { onHand: number; reserved: number; warehouse: { name: string } }[]; listings: { id: string; status: string; channelAccount: { label: string; channel: { name: string } } }[] }[];
+  variants: { id: string; sku: string; barcode: string | null; color: string | null; size: string | null; costPrice: string | null; listPrice: string | null; balances: { onHand: number; reserved: number; warehouse: { name: string } }[]; listings: { id: string; status: string; lastError: string | null; channelAccount: { id: string; label: string; channel: { name: string } } }[] }[];
 }
 
 export default function ProductDetailPage() {
@@ -82,6 +83,7 @@ export default function ProductDetailPage() {
           </tbody>
         </table>
       </section>
+      <PublishPanel productId={p.id} variants={p.variants} />
       <div className="text-xs text-slate-500">Brüt marj = (KDV hariç satış − maliyet) / KDV hariç satış. Komisyon, kargo ve reklam maliyeti Fiyat Yönetimi modülünde (Faz 6) hesaba katılacak.</div>
     </div>
   );

@@ -14,7 +14,7 @@ const STATUS: Record<string, { l: string; t: 'ok' | 'warn' | 'bad' | 'neutral' |
   ACTIVE: { l: 'Yayında', t: 'ok' }, PENDING: { l: 'Onay bekliyor', t: 'info' }, PAUSED: { l: 'Durduruldu', t: 'neutral' }, REJECTED: { l: 'Reddedildi', t: 'bad' },
   ERROR: { l: 'Hata', t: 'bad' }, DRAFT: { l: 'Taslak', t: 'warn' }, UNLINKED: { l: 'Eşleşmedi', t: 'warn' },
 };
-const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme' };
+const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme', BATCH_CHECK: 'Onay sonucu sorgulama' };
 
 export default function ListingsPage() {
   const qc = useQueryClient();
@@ -32,6 +32,9 @@ export default function ListingsPage() {
   const run = useMutation({ mutationFn: (type: string) => api<{ status?: string; error?: string }>(`/sync/accounts/${accountId}/run`, { method: 'POST', body: JSON.stringify({ type }) }), onSuccess: refresh });
   const link = useMutation({ mutationFn: (p: { id: string; variantId: string }) => api(`/listings/${p.id}/link`, { method: 'POST', body: JSON.stringify({ variantId: p.variantId }) }), onSuccess: refresh });
   const createProduct = useMutation({ mutationFn: (id: string) => api(`/listings/${id}/create-product`, { method: 'POST' }), onSuccess: refresh });
+  const [editing, setEditing] = useState<Listing | null>(null);
+  const [form, setForm] = useState({ title: '', price: '', salePrice: '' });
+  const saveListing = useMutation({ mutationFn: () => api(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title || undefined, price: form.price ? Number(form.price) : undefined, salePrice: form.salePrice ? Number(form.salePrice) : undefined }) }), onSuccess: () => { setEditing(null); refresh(); } });
   const acceptAll = useMutation({ mutationFn: () => api<{ linked: number; skipped: number }>('/listings/accept-suggestions', { method: 'POST', body: JSON.stringify({ accountId }) }), onSuccess: refresh });
 
   const err = (run.error ?? link.error ?? createProduct.error ?? acceptAll.error ?? listings.error) as Error | null;
@@ -58,6 +61,7 @@ export default function ListingsPage() {
           <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('ORDER_PULL')}>Siparişleri çek</button>
           <button className="btn-secondary" disabled={run.isPending} onClick={() => { if (confirm('Merkezi stok ve fiyatlar bu kanala gönderilecek. Devam?')) run.mutate('STOCK_PUSH'); }}>Stok/fiyat gönder</button>
           <button className="btn-secondary" disabled={acceptAll.isPending} onClick={() => acceptAll.mutate()}>Barkod eşleşmelerini kabul et</button>
+          <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('BATCH_CHECK')}>Onay sonuçlarını sorgula</button>
           {run.data?.status && <span className={`text-sm ${run.data.status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}`}>{run.data.status === 'SUCCESS' ? 'Tamamlandı' : `Hata: ${run.data.error}`}</span>}
           {acceptAll.data && <span className="text-sm text-slate-500">{acceptAll.data.linked} bağlandı, {acceptAll.data.skipped} çakışma/atlandı</span>}
         </div>
@@ -95,11 +99,24 @@ export default function ListingsPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge></td>
+                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge>{l.variant && <button className="mt-1 block text-xs text-brand-600 underline" onClick={() => { setEditing(l); setForm({ title: l.title ?? '', price: l.price ?? '', salePrice: '' }); }}>Düzenle</button>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
+          <form className="card w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); saveListing.mutate(); }}>
+            <div className="font-medium">Kanal-özel ilan bilgisi · {editing.channelAccount.channel.name}</div>
+            <div><label className="label">Başlık (en fazla 100)</label><input className="input" maxLength={100} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-2"><div><label className="label">Liste fiyatı</label><input className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div><div><label className="label">İndirimli fiyat</label><input className="input" type="number" step="0.01" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} /></div></div>
+            <div className="text-xs text-slate-500">Boş bırakılan alanlar merkezi üründen alınır. Değişiklik kanala "Stok/fiyat gönder" veya yeniden yayınlama ile gider.</div>
+            {saveListing.error && <ErrorBox message={(saveListing.error as Error).message} />}
+            <div className="flex gap-2"><button className="btn-primary" disabled={saveListing.isPending}>Kaydet</button><button type="button" className="btn-secondary" onClick={() => setEditing(null)}>Vazgeç</button></div>
+          </form>
         </div>
       )}
 
