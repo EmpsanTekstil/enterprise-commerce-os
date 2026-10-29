@@ -67,7 +67,7 @@ Durum anahtarı: ✅ resmî dokümanla doğrulandı · 🟡 var ama koşullu (on
 
 Not: Amazon bilgileri resmî dokümandan bilinen, kararlı özelliklerdir; adaptör yazılırken tekrar doğrulanacak.
 
-## 4. n11 — ✅ büyük ölçüde doğrulandı
+## 4. n11 — ✅ büyük ölçüde doğrulandı (adaptör yazıldı: ürün/kategori/stok-fiyat/ürün yükleme/sipariş/soru-cevap)
 
 **Portal:** https://developer.n11.com · **Üretim:** `https://api.n11.com` (REST/JSON; eski SOAP API yerini aldı) · **Kimlik:** `appKey` ve `appSecret` başlıkları. Anahtarlar: n11 Mağaza Paneli → API hesapları.
 
@@ -86,7 +86,7 @@ Not: Amazon bilgileri resmî dokümandan bilinen, kararlı özelliklerdir; adapt
 | Kategori / özellik | ✅ | `GET /cdn/categories`, Kategori Özellikleri Listeleme |
 | Webhook | ❌ | Dokümanda yok |
 
-## 5. idefix — ✅ doğrulandı
+## 5. idefix — ✅ doğrulandı (adaptör yazıldı: ürün okuma/stok-fiyat/sipariş; ürün oluşturma ve iade planlandı)
 
 **Portal:** https://developer.idefix.com · **Üretim:** `https://merchantapi.idefix.com` (PIM ve OMS) · **Test:** `ide-pimapi.idefiks.net`, `ide-omsapi.idefiks.net` (test için IP yetkisi gerekir) · **Kimlik:** `X-API-KEY: base64(ApiKey:ApiSecret)`. Anahtarlar: Satıcı Paneli → Hesap Bilgilerim → Entegrasyon Bilgileri → "Yeni API Oluştur" (e-postaya gelir). 429'da `Retry-After` başlığı.
 

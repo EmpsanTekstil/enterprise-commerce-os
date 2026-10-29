@@ -12,8 +12,8 @@ const CREDENTIAL_FIELDS: Record<string, { key: string; label: string; secret?: b
   trendyol: [{ key: 'supplierId', label: 'Satıcı ID (Cari ID)' }, { key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],
   hepsiburada: [{ key: 'merchantId', label: 'Merchant ID' }, { key: 'username', label: 'Kullanıcı adı' }, { key: 'password', label: 'Şifre / Secret', secret: true }],
   amazon_tr: [{ key: 'sellerId', label: 'Seller ID' }, { key: 'clientId', label: 'LWA Client ID' }, { key: 'clientSecret', label: 'LWA Client Secret', secret: true }, { key: 'refreshToken', label: 'Refresh Token', secret: true }],
-  n11: [{ key: 'appKey', label: 'App Key' }, { key: 'appSecret', label: 'App Secret', secret: true }],
-  idefix: [{ key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],
+  n11: [{ key: 'appKey', label: 'App Key' }, { key: 'appSecret', label: 'App Secret', secret: true }, { key: 'integrator', label: 'Entegratör adı (isteğe bağlı)' }],
+  idefix: [{ key: 'vendorId', label: 'Vendor ID (Satıcı ID)' }, { key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],
   shopify: [{ key: 'shopDomain', label: 'Mağaza alan adı (ornek.myshopify.com)' }, { key: 'accessToken', label: 'Admin API Access Token', secret: true }],
 };
 
@@ -38,7 +38,7 @@ export default function IntegrationsPage() {
   const [testResult, setTestResult] = useState<Record<string, { ok: boolean; message: string }>>({});
 
   const create = useMutation({
-    mutationFn: () => api('/channels/accounts', { method: 'POST', body: JSON.stringify({ channelCode: adding, label, credentials: creds, externalSellerId: creds.supplierId ?? creds.merchantId ?? creds.sellerId ?? creds.shopDomain }) }),
+    mutationFn: () => api('/channels/accounts', { method: 'POST', body: JSON.stringify({ channelCode: adding, label, credentials: creds, externalSellerId: creds.supplierId ?? creds.merchantId ?? creds.sellerId ?? creds.vendorId ?? creds.shopDomain }) }),
     onSuccess: () => { setAdding(null); setLabel(''); setCreds({}); qc.invalidateQueries({ queryKey: ['channel-accounts'] }); },
   });
   const test = useMutation({

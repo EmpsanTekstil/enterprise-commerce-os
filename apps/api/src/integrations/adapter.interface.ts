@@ -91,6 +91,7 @@ export interface ExternalOrder {
   orderedAt: Date;
   customer?: { name?: string; email?: string; phone?: string };
   shippingAddress?: Record<string, unknown>;
+  billingAddress?: Record<string, unknown>;
   currency: string;
   grandTotal: number;
   items: {

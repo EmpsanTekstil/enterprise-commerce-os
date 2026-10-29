@@ -108,7 +108,7 @@ export class OrdersService {
 
     const base = {
       orderNumber: o.orderNumber, status, channelStatus: o.status, customerName: o.customer?.name, customerEmail: o.customer?.email, customerPhone: o.customer?.phone,
-      shippingAddress: o.shippingAddress as Prisma.InputJsonValue | undefined, currency: o.currency, grandTotal: o.grandTotal,
+      shippingAddress: o.shippingAddress as Prisma.InputJsonValue | undefined, billingAddress: o.billingAddress as Prisma.InputJsonValue | undefined, currency: o.currency, grandTotal: o.grandTotal,
       subtotal: resolved.reduce((s, i) => s + i.lineTotal, 0), commissionTotal, orderedAt: o.orderedAt, rawSnapshot: o.raw as Prisma.InputJsonValue,
       isDemo: account.isDemo,
     };
