@@ -61,7 +61,7 @@ describe('Ürün yayınlama (e2e)', () => {
     expect(ok.product.originCountryCode).toBe('TR');
     expect(ok.product.channelAttributes).toEqual(expect.arrayContaining([
       { attributeId: '338', valueId: '1' },            // Renk: Siyah → liste değeri
-      { attributeId: '343', customValue: 'S' },         // Beden: listede yok ama serbest değer izinli
+      { attributeId: '343', valueId: '10' },             // Beden: S listede var → liste değeri
       { attributeId: '47', customValue: 'Pamuk' },      // Materyal: kural ile teknik özellikten
     ]));
     expect(bad.problems).toEqual([expect.stringContaining('Zorunlu özellik eksik: Renk')]);

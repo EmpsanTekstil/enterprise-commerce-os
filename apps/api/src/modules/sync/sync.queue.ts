@@ -52,6 +52,6 @@ export class SyncQueue implements OnModuleInit, OnModuleDestroy {
       return { queued: true, jobId: job.id };
     }
     const r = await this.sync.run(accountId, type, payload, idempotencyKey);
-    return { queued: false, jobId: r.id, status: r.status, error: r.error };
+    return { queued: false, jobId: r.id, status: r.status, error: r.error, result: r.result };
   }
 }
