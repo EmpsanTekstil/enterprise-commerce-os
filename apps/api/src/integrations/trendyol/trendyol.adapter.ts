@@ -1,6 +1,6 @@
 import {
   AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalCategory, ExternalOrder,
-  ExternalProduct, ExternalQuestion, PagedResult, PushResult, UnsupportedOperationError,
+  ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult, UnsupportedOperationError,
 } from '../adapter.interface';
 import { HttpError, httpRequest } from '../http-client';
 
@@ -27,8 +27,8 @@ export class TrendyolAdapter implements ChannelAdapter {
     'price.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Barkod başına 30 istek/dk' },
     'orders.read':     { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'Order V2, en fazla 2 haftalık aralık' },
     'shipping.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'updatePackage, changeCargoProvider, sendInvoiceLink' },
-    'returns.read':    { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'getClaims' },
-    'returns.update':  { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'approveClaimLineItems / createClaimIssue' },
+    'returns.read':    { status: 'supported', docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'getClaims' },
+    'returns.update':  { status: 'supported', docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'approveClaimLineItems; ret talebi çoğu sebepte dosya ister (panelden)' },
     'questions.read':  { status: 'supported', docUrl: 'https://developers.trendyol.com/reference/getquestionfilter' },
     'questions.answer':{ status: 'supported', docUrl: 'https://developers.trendyol.com/reference/answerquestion', note: '10-2000 karakter; Trendyol incelemesi sonrası yayınlanır' },
     'reviews.read':    { status: 'unsupported', note: 'Resmî satıcı API dokümanında yorum uç noktası yok (29.10.2026)' },
@@ -240,6 +240,53 @@ export class TrendyolAdapter implements ChannelAdapter {
       raw: p,
     }));
     return { items, total: r.totalElements, nextCursor: page + 1 < (r.totalPages ?? 0) ? String(page + 1) : undefined };
+  }
+
+  async fetchReturns(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalReturn>> {
+    const page = Number(cursor ?? 0);
+    interface Claim {
+      id: string; orderNumber: string; orderDate?: number; claimDate: number; customerFirstName?: string; customerLastName?: string; cargoTrackingNumber?: string | number;
+      items?: { orderLine?: { id?: number; productName?: string; barcode?: string; merchantSku?: string }; claimItems?: { id: string; orderLineItemId?: string; claimItemStatus?: { name?: string }; customerClaimItemReason?: { name?: string }; note?: string }[] }[];
+    }
+    const startDate = Math.max(since.getTime(), Date.now() - 14 * 86_400_000);
+    const r = await httpRequest<{ content: Claim[]; totalPages?: number; totalElements?: number }>({
+      method: 'GET', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/claims?startDate=${startDate}&endDate=${Date.now()}&page=${page}&size=50`, headers: this.headers(ctx),
+    });
+    const items = (r.content ?? []).map<ExternalReturn>((c) => {
+      const lines = (c.items ?? []).flatMap((it) => (it.claimItems ?? []).map((ci) => ({
+        claimItemId: ci.id, orderLineExternalId: it.orderLine?.id != null ? String(it.orderLine.id) : undefined, barcode: it.orderLine?.barcode, sku: it.orderLine?.merchantSku,
+        name: it.orderLine?.productName, quantity: 1, status: ci.claimItemStatus?.name, reason: ci.customerClaimItemReason?.name, note: ci.note,
+      })));
+      const statuses = [...new Set(lines.map((l) => l.status).filter(Boolean))] as string[];
+      return {
+        externalId: String(c.id), orderNumber: c.orderNumber, status: statuses.includes('WaitingInAction') ? 'WaitingInAction' : statuses[0] ?? 'Created',
+        reason: lines[0]?.reason, customerName: [c.customerFirstName, c.customerLastName].filter(Boolean).join(' '), trackingNumber: c.cargoTrackingNumber ? String(c.cargoTrackingNumber) : undefined,
+        requestedAt: new Date(c.claimDate), items: lines, raw: c,
+      };
+    });
+    return { items, total: r.totalElements, nextCursor: page + 1 < (r.totalPages ?? 0) ? String(page + 1) : undefined };
+  }
+
+  async approveReturn(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[]): Promise<PushResult> {
+    try {
+      await httpRequest({ method: 'PUT', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/claims/${returnExternalId}/items/approve`, headers: this.headers(ctx), body: { claimLineItemIdList: claimItemIds, params: {} } });
+      return { ok: true };
+    } catch (e) { return { ok: false, error: (e as Error).message }; }
+  }
+
+  async rejectReturn(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[], reasonId: string, description: string): Promise<PushResult> {
+    // Trendyol çoğu ret sebebinde dosya (kanıt) ister; dosyasız kabul edilen sebepler: 1651, 451, 2101. Dosyalı ret şimdilik satıcı panelinden.
+    try {
+      const q = new URLSearchParams({ claimIssueReasonId: reasonId, claimItemIdList: claimItemIds.join(','), description: description.slice(0, 500) });
+      await httpRequest({ method: 'POST', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/claims/${returnExternalId}/issue?${q}`, headers: this.headers(ctx) });
+      return { ok: true };
+    } catch (e) { return { ok: false, error: (e as Error).message }; }
+  }
+
+  async fetchReturnRejectReasons(ctx: AdapterContext) {
+    const r = await httpRequest<{ id: number; name: string }[] | { content?: { id: number; name: string }[] }>({ method: 'GET', url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/claims/issue-reasons`, headers: this.headers(ctx) });
+    const list = Array.isArray(r) ? r : r.content ?? [];
+    return list.map((x) => ({ id: String(x.id), name: x.name }));
   }
 
   async fetchQuestions(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalQuestion>> {

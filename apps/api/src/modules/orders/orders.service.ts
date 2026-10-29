@@ -21,7 +21,8 @@ export function mapOrderStatus(raw: string): OrderStatus {
 }
 
 const STOCK_CONSUMING: OrderStatus[] = ['NEW', 'CONFIRMED', 'PICKING', 'PACKED', 'SHIPPED', 'DELIVERED', 'UNKNOWN'];
-const STOCK_RELEASING: OrderStatus[] = ['CANCELLED', 'RETURNED'];
+// İade (RETURNED) otomatik stok iadesi yapmaz: ürün fiziksel kontrol sonrası İadeler ekranından 'Stoğa al' ile girilir.
+const STOCK_RELEASING: OrderStatus[] = ['CANCELLED'];
 
 @Injectable()
 export class OrdersService {

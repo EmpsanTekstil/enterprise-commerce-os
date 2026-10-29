@@ -27,6 +27,7 @@ export class SyncScheduler implements OnModuleInit, OnModuleDestroy {
     const bucket = Math.floor(Date.now() / 300_000); // 5 dk'lık pencere → aynı pencerede tek iş
     for (const a of accounts) {
       await this.queue.enqueue(a.id, 'ORDER_PULL', {}, `order-pull:${a.id}:${bucket}`);
+      if (Math.floor(Date.now() / 900_000) !== Math.floor((Date.now() - 300_000) / 900_000)) await this.queue.enqueue(a.id, 'RETURN_PULL', {}, `return-pull:${a.id}:${Math.floor(Date.now() / 900_000)}`); // 15 dk'da bir
       const pending = await this.prisma.listing.count({ where: { channelAccountId: a.id, status: 'PENDING', batchRequestId: { not: null } } });
       if (pending) await this.queue.enqueue(a.id, 'BATCH_CHECK', {}, `batch-check:${a.id}:${bucket}`);
     }

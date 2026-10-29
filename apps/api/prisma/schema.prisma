@@ -435,6 +435,7 @@ enum SyncJobType {
   REVIEW_PULL
   ADS_PULL
   BATCH_CHECK
+  RETURN_PULL
 }
 
 enum SyncJobStatus {
@@ -677,6 +678,9 @@ model Return {
   id              String       @id @default(uuid())
   orderId         String
   externalId      String?
+  channelStatus   String?      // kanalın ham iade durumu
+  customerName    String?
+  canActViaApi    Boolean      @default(false)
   status          ReturnStatus @default(REQUESTED)
   reason          String?
   itemsJson       Json         // [{orderItemId, quantity}]
@@ -689,6 +693,7 @@ model Return {
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  @@unique([orderId, externalId])
   @@index([orderId])
 }
 

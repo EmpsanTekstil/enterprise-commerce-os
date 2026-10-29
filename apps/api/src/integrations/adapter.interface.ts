@@ -128,6 +128,19 @@ export interface ExternalReview {
   raw: unknown;
 }
 
+export interface ExternalReturn {
+  externalId: string;
+  orderExternalId?: string;   // paket/sipariş kimliği
+  orderNumber?: string;
+  status: string;             // kanal ham durumu
+  reason?: string;
+  customerName?: string;
+  trackingNumber?: string;
+  requestedAt: Date;
+  items: { claimItemId: string; orderLineExternalId?: string; barcode?: string; sku?: string; name?: string; quantity: number; status?: string; reason?: string; note?: string }[];
+  raw: unknown;
+}
+
 export interface ExternalCategory {
   externalId: string;
   parentExternalId?: string;
@@ -195,6 +208,11 @@ export interface ChannelAdapter {
 
   fetchOrders?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalOrder>>;
   updateShipment?(ctx: AdapterContext, orderExternalId: string, data: { trackingNumber?: string; carrierCode?: string; status?: string }): Promise<PushResult>;
+
+  fetchReturns?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalReturn>>;
+  approveReturn?(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[]): Promise<PushResult>;
+  rejectReturn?(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[], reasonId: string, description: string): Promise<PushResult>;
+  fetchReturnRejectReasons?(ctx: AdapterContext): Promise<{ id: string; name: string }[]>;
 
   fetchQuestions?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalQuestion>>;
   answerQuestion?(ctx: AdapterContext, questionExternalId: string, text: string): Promise<PushResult>;
