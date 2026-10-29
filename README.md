@@ -91,4 +91,5 @@ infra/     Dockerfile'lar
 - [x] Faz 3 son — Excel/CSV ile toplu ürün yükleme, toplu fiyat/stok (şablon, önizleme, satır bazlı hata raporu)
 - [x] Faz 4 devam — Kanala ürün yayınlama: hazırlık kontrolü (barkod, görsel, marka, kategori eşleştirme, zorunlu özellikler), Trendyol Product Create v2, kanal onay sonucu takibi (ACTIVE/REJECTED), kanal-özel başlık/fiyat
 - [x] Faz 6 (iade) — Kanaldan iade talepleri, onay/ret (API destekliyorsa), fiziksel kontrol sonrası idempotent stoğa alma, Kargo ve İadeler ekranı
-- [ ] Faz 6 devam — Paketleme iş akışı, kargo takip güncelleme (updatePackage), Trendyol webhook alıcısı, çoklu depo ekranı
+- [x] Faz 6 devam — Paketleme akışı (toplama/faturalama/takip no → kanala bildirim), webhook alıcısı (anahtar doğrulamalı), Stok ve Depolar ekranı (bakiyeler, kritik stok, elle düzeltme, hareket geçmişi, çoklu depo, kanal stok politikası, mutabakat)
+- [ ] Faz 5 — Hepsiburada, n11, idefix, Amazon TR, Shopify adaptörleri

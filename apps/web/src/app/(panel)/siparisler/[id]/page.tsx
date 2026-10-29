@@ -1,6 +1,7 @@
 'use client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
+import { useState } from 'react';
 import { Badge, ErrorBox } from '@/components/ui';
 import { api, fmtTRY } from '@/lib/api';
 import { ORDER_STATUS } from '@/lib/status';
@@ -17,7 +18,10 @@ interface Detail {
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => api<Detail>(`/orders/${id}`) });
+  const [inv, setInv] = useState(''); const [trk, setTrk] = useState('');
+  const fulfill = useMutation({ mutationFn: (action: 'picking' | 'invoiced') => api(`/orders/${id}/fulfill`, { method: 'POST', body: JSON.stringify({ action, invoiceNumber: inv || undefined, trackingNumber: trk || undefined }) }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); qc.invalidateQueries({ queryKey: ['orders'] }); } });
   if (q.error) return <ErrorBox message={(q.error as Error).message} />;
   if (!q.data) return <div className="text-sm text-slate-500">Yükleniyor…</div>;
   const o = q.data; const p = o.profitEstimate;
@@ -29,6 +33,17 @@ export default function OrderDetailPage() {
         <Badge tone={ORDER_STATUS[o.status]?.t ?? 'neutral'}>{ORDER_STATUS[o.status]?.l ?? o.status}</Badge>
         <span className="text-sm text-slate-500">{o.channelAccount.channel.name} · {o.channelAccount.label} · {new Date(o.orderedAt).toLocaleString('tr-TR')}</span>
       </div>
+      {['NEW', 'CONFIRMED', 'PICKING'].includes(o.status) && (
+        <section className="card flex flex-wrap items-end gap-2 text-sm">
+          <div className="font-medium">Paketleme</div>
+          {o.status !== 'PICKING' && <button className="btn-secondary" disabled={fulfill.isPending} onClick={() => fulfill.mutate('picking')}>Toplamaya başla</button>}
+          <div><label className="label">Fatura no</label><input className="input w-44" value={inv} onChange={(e) => setInv(e.target.value)} /></div>
+          <div><label className="label">Takip no (kendi kargon varsa)</label><input className="input w-44" value={trk} onChange={(e) => setTrk(e.target.value)} /></div>
+          <button className="btn-primary" disabled={!inv || fulfill.isPending} onClick={() => { if (confirm('Kanala "faturalandı/paketlendi" bildirilecek. Devam?')) fulfill.mutate('invoiced'); }}>Faturalandı · Paketlendi</button>
+          {fulfill.error && <ErrorBox message={(fulfill.error as Error).message} />}
+          <div className="w-full text-xs text-slate-500">Trendyol'da kargo etiketi kanal tarafından üretilir; takip numarası yalnızca kendi kargo anlaşmanız varsa girilir.</div>
+        </section>
+      )}
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="card text-sm space-y-1"><div className="font-medium">Müşteri</div><div>{o.customerName ?? '—'}</div><div className="text-slate-500">{o.customerEmail ?? ''} {o.customerPhone ?? ''}</div><div className="text-slate-500">{addr}</div></section>
         <section className="card text-sm space-y-1"><div className="font-medium">Kargo</div>{o.shipments.length === 0 ? <div className="text-slate-500">Henüz kargo bilgisi yok</div> : o.shipments.map((s) => <div key={s.id}>{s.carrierName ?? '—'} · <span className="font-mono">{s.trackingNumber ?? '—'}</span>{s.trackingUrl && <a className="ml-2 text-brand-600 underline" href={s.trackingUrl} target="_blank" rel="noreferrer">Takip</a>}</div>)}</section>

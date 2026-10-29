@@ -45,6 +45,8 @@ export default function IntegrationsPage() {
     mutationFn: (id: string) => api<{ ok: boolean; message: string }>(`/channels/accounts/${id}/test`, { method: 'POST' }),
     onSuccess: (r, id) => { setTestResult((t) => ({ ...t, [id]: r })); qc.invalidateQueries({ queryKey: ['channel-accounts'] }); },
   });
+  const [webhook, setWebhook] = useState<{ url: string; header: string; key: string; note: string } | null>(null);
+  const webhookKey = useMutation({ mutationFn: (id: string) => api<{ url: string; header: string; key: string; note: string }>(`/channels/accounts/${id}/webhook-key`, { method: 'POST' }), onSuccess: (r) => setWebhook(r) });
   const remove = useMutation({
     mutationFn: (id: string) => api(`/channels/accounts/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['channel-accounts'] }),
@@ -62,7 +64,7 @@ export default function IntegrationsPage() {
               <div className="flex items-center gap-2"><span className="font-medium">{a.channel.name}</span><span className="text-sm text-slate-500">{a.label}</span><span className="ml-auto"><Badge tone={a.status === 'CONNECTED' ? 'ok' : a.status === 'ERROR' ? 'bad' : 'warn'}>{STATUS_TEXT[a.status] ?? a.status}</Badge></span></div>
               <div className="text-xs text-slate-500">{Object.entries(a.credentialSummary).map(([k, v]) => `${k}: ${v}`).join(' · ')}</div>
               {(testResult[a.id] || a.lastError) && <div className={`text-xs ${testResult[a.id]?.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{testResult[a.id]?.message ?? a.lastError}</div>}
-              <div className="flex gap-2"><button className="btn-secondary" onClick={() => test.mutate(a.id)} disabled={test.isPending}>Bağlantıyı test et</button><button className="btn-danger" onClick={() => { if (confirm('Hesap silinsin mi? İlan ve sipariş kayıtları da silinir.')) remove.mutate(a.id); }}>Sil</button></div>
+              <div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => test.mutate(a.id)} disabled={test.isPending}>Bağlantıyı test et</button>{channels.data?.find((c) => c.code === a.channel.code)?.capabilities?.webhooks?.status === 'supported' && <button className="btn-secondary" onClick={() => { if (confirm('Yeni webhook anahtarı üretilecek; eski anahtar geçersiz olur. Devam?')) webhookKey.mutate(a.id); }}>Webhook anahtarı</button>}<button className="btn-danger" onClick={() => { if (confirm('Hesap silinsin mi? İlan ve sipariş kayıtları da silinir.')) remove.mutate(a.id); }}>Sil</button></div>
             </div>
           ))}
         </div>
@@ -87,6 +89,18 @@ export default function IntegrationsPage() {
         </div>
       </section>
 
+      {webhook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setWebhook(null)}>
+          <div className="card w-full max-w-lg space-y-2 text-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="font-medium">Webhook bilgileri</div>
+            <div><span className="text-slate-500">URL:</span> <code className="break-all">{webhook.url}</code></div>
+            <div><span className="text-slate-500">Başlık:</span> <code>{webhook.header}</code></div>
+            <div><span className="text-slate-500">Anahtar:</span> <code className="break-all">{webhook.key}</code></div>
+            <div className="text-xs text-amber-700">{webhook.note} Uygulamanın internetten erişilebilir bir adresi (PUBLIC_API_URL) olmalıdır; localhost adresine kanal ulaşamaz.</div>
+            <button className="btn-secondary" onClick={() => setWebhook(null)}>Kapat</button>
+          </div>
+        </div>
+      )}
       {adding && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setAdding(null)}>
           <form className="card w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>

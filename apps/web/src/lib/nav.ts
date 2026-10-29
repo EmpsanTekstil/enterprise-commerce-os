@@ -13,7 +13,7 @@ export const NAV: NavItem[] = [
   { href: '/toplu-islemler', label: 'Toplu Ürün İşlemleri', icon: Layers, ready: true, group: 'Katalog' },
   { href: '/yayinlar', label: 'Pazaryeri Yayınları', icon: Store, ready: true, group: 'Katalog' },
   { href: '/siparisler', label: 'Siparişler', icon: ShoppingCart, ready: true, group: 'Operasyon' },
-  { href: '/stok', label: 'Stok ve Depolar', icon: Warehouse, group: 'Operasyon' },
+  { href: '/stok', label: 'Stok ve Depolar', icon: Warehouse, ready: true, group: 'Operasyon' },
   { href: '/kargo', label: 'Kargo ve İadeler', icon: Truck, ready: true, group: 'Operasyon' },
   { href: '/fiyat', label: 'Fiyat Yönetimi', icon: Tags, group: 'Operasyon' },
   { href: '/reklam', label: 'Reklam Merkezi', icon: Megaphone, group: 'Reklam' },
