@@ -17,6 +17,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { MediaModule } from './modules/media/media.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { BulkModule } from './modules/bulk/bulk.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
     SyncModule,
     MediaModule,
     CategoriesModule,
+    BulkModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
