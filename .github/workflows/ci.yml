@@ -42,7 +42,8 @@ jobs:
       - run: npm run test:e2e -w @eco/api -- --json --outputFile=/tmp/e2e.json
       - name: Test özetini commit yorumu olarak yaz
         if: always()
-        env: { GH_TOKEN: ${{ github.token }} }
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           node -e '
             const fs=require("fs");const rd=f=>{try{return JSON.parse(fs.readFileSync(f,"utf8"))}catch{return null}};
