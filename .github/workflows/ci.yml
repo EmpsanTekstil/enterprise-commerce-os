@@ -1,5 +1,7 @@
 name: CI
 on: [push, pull_request]
+permissions:
+  contents: write
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -37,9 +39,14 @@ jobs:
       - run: npm run test:e2e -w @eco/api
       - run: npm run build -w @eco/api
       - run: npm run build -w @eco/web
-      - uses: actions/upload-artifact@v4
-        with:
-          name: generated-files
-          path: |
-            package-lock.json
-            apps/api/prisma/migrations
+      # Üretilen migration ve lock dosyalarını depoya geri yaz (yalnızca main, yalnızca değişiklik varsa)
+      - name: Üretilen dosyaları commit et
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json apps/api/prisma/migrations
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: migration ve package-lock üretildi [skip ci]"
+            git push
+          fi
