@@ -10,7 +10,8 @@ import { HttpError, httpRequest } from '../http-client';
  * Kimlik: Basic Auth (apiKey:apiSecret) + "User-Agent: {supplierId} - SelfIntegration"
  * Gerekli credentials alanları: supplierId, apiKey, apiSecret
  *
- * Uç noktalar docs/04-KANAL-API-YETENEK-MATRISI.md içinde doküman bağlantılarıyla listelenir.
+ * Uç noktalar Product V2 / Order V2 (V1 servisleri 15 Ekim 2026'da kapatıldı).
+ * Ayrıntı ve doküman bağlantıları: docs/04-KANAL-API-YETENEK-MATRISI.md
  * Burada "status: planned" olan işlemler henüz kodlanmadı; çağrılırsa hata fırlatır.
  */
 export class TrendyolAdapter implements ChannelAdapter {
@@ -19,25 +20,25 @@ export class TrendyolAdapter implements ChannelAdapter {
   readonly baseUrl = process.env.TRENDYOL_BASE_URL ?? 'https://apigw.trendyol.com/integration';
 
   readonly capabilities: CapabilityMatrix = {
-    'products.read':   { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'products.create': { status: 'planned',   docUrl: 'https://developers.trendyol.com', note: 'Faz 4' },
-    'products.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com', note: 'Faz 4' },
-    'stock.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'price.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'orders.read':     { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'shipping.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com', note: 'Takip numarası ve paket durumu' },
-    'returns.read':    { status: 'planned',   docUrl: 'https://developers.trendyol.com', note: 'İade talepleri (claims)' },
-    'returns.update':  { status: 'planned',   docUrl: 'https://developers.trendyol.com', note: 'İade onay/ret' },
-    'questions.read':  { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'questions.answer':{ status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'reviews.read':    { status: 'unverified', note: 'Resmî dokümanda satıcı yorum okuma uç noktası doğrulanmadı' },
-    'reviews.reply':   { status: 'unverified' },
-    'ads.reports':     { status: 'unverified', note: 'Trendyol Reklam için açık API dokümanı doğrulanmadı' },
-    'ads.create':      { status: 'unverified' },
-    'ads.budget':      { status: 'unverified' },
-    'ads.pause':       { status: 'unverified' },
-    'categories.read': { status: 'supported', docUrl: 'https://developers.trendyol.com' },
-    'webhooks':        { status: 'unverified' },
+    'products.read':   { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Onaylı/onaysız ürün filtreleme V2' },
+    'products.create': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/product-create-v2', note: 'Faz 4 — POST .../sellers/{id}/v2/products' },
+    'products.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Faz 4 — content/variant/delivery bulk-update' },
+    'stock.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'price-and-inventory, asenkron batch' },
+    'price.update':    { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/product-v2-api-endpoint', note: 'Barkod başına 30 istek/dk' },
+    'orders.read':     { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'Order V2, en fazla 2 haftalık aralık' },
+    'shipping.update': { status: 'planned',   docUrl: 'https://developers.trendyol.com/v2.0/docs/get-order-packages-getshipmentpackages', note: 'updatePackage, changeCargoProvider, sendInvoiceLink' },
+    'returns.read':    { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'getClaims' },
+    'returns.update':  { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/i%CC%87ade-s%C3%BCreci-ak%C4%B1%C5%9F%C4%B1', note: 'approveClaimLineItems / createClaimIssue' },
+    'questions.read':  { status: 'supported', docUrl: 'https://developers.trendyol.com/reference/getquestionfilter' },
+    'questions.answer':{ status: 'supported', docUrl: 'https://developers.trendyol.com/reference/answerquestion', note: '10-2000 karakter; Trendyol incelemesi sonrası yayınlanır' },
+    'reviews.read':    { status: 'unsupported', note: 'Resmî satıcı API dokümanında yorum uç noktası yok (29.10.2026)' },
+    'reviews.reply':   { status: 'unsupported', note: 'API yok; yalnızca satıcı panelinden' },
+    'ads.reports':     { status: 'unsupported', note: 'Trendyol Reklam için açık satıcı API dokümanı yok (29.10.2026)' },
+    'ads.create':      { status: 'unsupported' },
+    'ads.budget':      { status: 'unsupported' },
+    'ads.pause':       { status: 'unsupported' },
+    'categories.read': { status: 'supported', docUrl: 'https://developers.trendyol.com/v2.0/docs/trendyol-category-list-getcategorytree-1', note: '50 istek/dk' },
+    'webhooks':        { status: 'planned',   docUrl: 'https://developers.trendyol.com/docs/webhook-model', note: 'Sipariş paketi olayları; satıcı başına 15 webhook' },
   };
 
   private headers(ctx: AdapterContext) {
@@ -58,7 +59,7 @@ export class TrendyolAdapter implements ChannelAdapter {
       // En hafif doğrulama: 1 ürünlük sayfa iste. 401/403 → anahtar hatalı.
       const r = await httpRequest<{ totalElements?: number }>({
         method: 'GET',
-        url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products?page=0&size=1`,
+        url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products/approved?page=0&size=1`,
         headers: this.headers(ctx),
         retries: 0,
       });
@@ -88,7 +89,7 @@ export class TrendyolAdapter implements ChannelAdapter {
   }
 
   async fetchCategoryAttributes(ctx: AdapterContext, categoryExternalId: string) {
-    return httpRequest({ method: 'GET', url: `${this.baseUrl}/product/product-categories/${categoryExternalId}/attributes`, headers: this.headers(ctx) });
+    return httpRequest({ method: 'GET', url: `${this.baseUrl}/product/categories/${categoryExternalId}/attributes`, headers: this.headers(ctx) });
   }
 
   async fetchProducts(ctx: AdapterContext, cursor?: string): Promise<PagedResult<ExternalProduct>> {
@@ -101,7 +102,7 @@ export class TrendyolAdapter implements ChannelAdapter {
     }
     const r = await httpRequest<{ content: TyProduct[]; totalElements: number; totalPages: number }>({
       method: 'GET',
-      url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products?page=${page}&size=${size}`,
+      url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products/approved?page=${page}&size=${size}`,
       headers: this.headers(ctx),
     });
     const items = (r.content ?? []).map<ExternalProduct>((p) => ({
@@ -157,7 +158,7 @@ export class TrendyolAdapter implements ChannelAdapter {
     const startDate = Math.max(since.getTime(), Date.now() - 14 * 86_400_000); // Trendyol en fazla 2 haftalık aralık kabul eder
     const r = await httpRequest<{ content: TyPackage[]; totalPages: number; totalElements: number }>({
       method: 'GET',
-      url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/orders?startDate=${startDate}&endDate=${Date.now()}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`,
+      url: `${this.baseUrl}/order/sellers/${this.sellerId(ctx)}/v2/orders?startDate=${startDate}&endDate=${Date.now()}&page=${page}&size=200&orderByField=PackageLastModifiedDate&orderByDirection=DESC`,
       headers: this.headers(ctx),
     });
     const items = (r.content ?? []).map<ExternalOrder>((p) => ({
