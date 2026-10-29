@@ -28,7 +28,7 @@ describe('Senkronizasyon (e2e)', () => {
     token = r.body.accessToken;
     // Önceki koşulardan kalan test hesaplarını temizle
     const list = await request(app.getHttpServer()).get('/api/v1/channels/accounts').set(auth());
-    for (const a of list.body.filter((x: { channel: { code: string } }) => x.channel.code === 'mock')) {
+    for (const a of list.body.filter((x: { channel: { code: string }; label: string }) => x.channel.code === 'mock' && x.label === 'Test Mağazası')) {
       await request(app.getHttpServer()).delete(`/api/v1/channels/accounts/${a.id}`).set(auth());
     }
     MockAdapter.pushed = []; MockAdapter.extraOrders = [];
