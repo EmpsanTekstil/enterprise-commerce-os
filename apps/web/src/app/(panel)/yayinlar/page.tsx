@@ -14,7 +14,7 @@ const STATUS: Record<string, { l: string; t: 'ok' | 'warn' | 'bad' | 'neutral' |
   ACTIVE: { l: 'Yayında', t: 'ok' }, PENDING: { l: 'Onay bekliyor', t: 'info' }, PAUSED: { l: 'Durduruldu', t: 'neutral' }, REJECTED: { l: 'Reddedildi', t: 'bad' },
   ERROR: { l: 'Hata', t: 'bad' }, DRAFT: { l: 'Taslak', t: 'warn' }, UNLINKED: { l: 'Eşleşmedi', t: 'warn' },
 };
-const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme', BATCH_CHECK: 'Onay sonucu sorgulama' };
+const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme', BATCH_CHECK: 'Onay sonucu sorgulama', RETURN_PULL: 'İade çekme' };
 
 export default function ListingsPage() {
   const qc = useQueryClient();
@@ -59,6 +59,7 @@ export default function ListingsPage() {
           <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('CATEGORY_PULL')}>Kategorileri çek</button>
           <button className="btn-primary" disabled={run.isPending} onClick={() => run.mutate('PRODUCT_PULL')}>Ürünleri içe aktar</button>
           <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('ORDER_PULL')}>Siparişleri çek</button>
+          <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('RETURN_PULL')}>İadeleri çek</button>
           <button className="btn-secondary" disabled={run.isPending} onClick={() => { if (confirm('Merkezi stok ve fiyatlar bu kanala gönderilecek. Devam?')) run.mutate('STOCK_PUSH'); }}>Stok/fiyat gönder</button>
           <button className="btn-secondary" disabled={acceptAll.isPending} onClick={() => acceptAll.mutate()}>Barkod eşleşmelerini kabul et</button>
           <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('BATCH_CHECK')}>Onay sonuçlarını sorgula</button>
