@@ -27,8 +27,10 @@ export class AiService {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const started = Date.now();
     try {
-      const res = await client.messages.create({ model: this.model, max_tokens: maxTokens, temperature: 0.2, system, messages: [{ role: 'user', content: userPrompt }] });
-      const text = res.content.filter((c) => c.type === 'text').map((c) => (c as { text: string }).text).join('\n').trim();
+      const res = (await client.messages.create({ model: this.model, max_tokens: maxTokens, temperature: 0.2, system, messages: [{ role: 'user', content: userPrompt }] })) as unknown as {
+        content: { type: string; text?: string }[]; usage: { input_tokens: number; output_tokens: number };
+      };
+      const text = res.content.filter((c) => c.type === 'text').map((c) => c.text ?? '').join('\n').trim();
       const inputTokens = res.usage.input_tokens; const outputTokens = res.usage.output_tokens;
       const costUsd = (inputTokens * this.inPrice + outputTokens * this.outPrice) / 1_000_000;
       const req = await this.prisma.aIRequest.create({ data: { organizationId, userId: user?.sub, feature, model: this.model, inputTokens, outputTokens, costUsd, inputSummary: userPrompt.slice(0, 500), outputSummary: text.slice(0, 500), status: 'SUCCESS' } });
