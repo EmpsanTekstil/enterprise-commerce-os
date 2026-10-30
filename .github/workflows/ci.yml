@@ -72,6 +72,32 @@ jobs:
           gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/summary.md)" >/dev/null || true
       - run: npm run build -w @eco/api
       - run: npm run build -w @eco/web
+      - name: Arayüz testleri (Playwright)
+        env:
+          SYNC_SCHEDULER: 'off'
+          API_PORT: '4000'
+          NEXT_PUBLIC_API_URL: http://localhost:4000
+          WEB_URL: http://localhost:3000
+        run: |
+          npx playwright install --with-deps chromium
+          (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
+          (cd apps/web && npx next start -p 3000 > /tmp/web.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health >/dev/null && curl -sf http://localhost:3000/giris >/dev/null && break; sleep 2; done
+          curl -sf http://localhost:4000/api/v1/health || (cat /tmp/api.log; exit 1)
+          npm run test:ui -w @eco/web
+      - name: Arayüz test özeti
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node -e '
+            const fs=require("fs");let r=null;try{r=JSON.parse(fs.readFileSync("/tmp/ui.json","utf8"))}catch{}
+            if(!r){fs.writeFileSync("/tmp/ui.md","Arayüz: çalışmadı\n");process.exit(0)}
+            const all=[];const walk=s=>{(s.specs||[]).forEach(sp=>all.push(sp));(s.suites||[]).forEach(walk)};r.suites.forEach(walk);
+            const failed=all.filter(s=>!s.ok);
+            fs.writeFileSync("/tmp/ui.md",`Arayüz (Playwright): ${all.length-failed.length} geçti, ${failed.length} başarısız\n`+failed.map(f=>"- "+f.title+"\n```\n"+((f.tests[0].results[0].error||{}).message||"").slice(0,600)+"\n```").join("\n"));
+          '
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/ui.md)" >/dev/null || true
       - name: Docker imajları derlenebilir mi
         run: |
           docker build -f infra/api.Dockerfile -t eco-api:ci . 
