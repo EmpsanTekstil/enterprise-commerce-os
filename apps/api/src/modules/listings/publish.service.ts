@@ -87,10 +87,10 @@ export class PublishService {
     return { requested: variantIds.length, sent, failed, blocked: blocked.map((b) => ({ sku: b.sku, problems: b.problems })), batchRequestId };
   }
 
-  /** PENDING ilanların toplu işlem sonuçlarını sorgular (senkron işi BATCH_CHECK). */
+  /** Toplu işlem sonuçlarını sorgular (senkron işi BATCH_CHECK): PENDING ilanlar (yayın/içerik) + fiyat/stok gönderimi bekleyen ilanlar. */
   async checkBatches(account: Account, adapter: ChannelAdapter, ctx: AdapterContext) {
     if (!adapter.checkBatch) return { checked: 0 };
-    const pending = await this.prisma.listing.findMany({ where: { channelAccountId: account.id, status: 'PENDING', batchRequestId: { not: null } } });
+    const pending = await this.prisma.listing.findMany({ where: { channelAccountId: account.id, batchRequestId: { not: null } } });
     const byBatch = new Map<string, typeof pending>();
     for (const l of pending) byBatch.set(l.batchRequestId!, [...(byBatch.get(l.batchRequestId!) ?? []), l]);
     let approved = 0, rejected = 0, stillPending = 0;
@@ -100,8 +100,9 @@ export class PublishService {
       for (const l of listings) {
         const item = st.items.find((i) => i.externalId === l.externalId);
         if (!item) { stillPending++; continue; }
-        if (item.ok) { approved++; await this.prisma.listing.update({ where: { id: l.id }, data: { status: 'ACTIVE', lastError: null, lastSyncedAt: new Date() } }); }
-        else { rejected++; await this.prisma.listing.update({ where: { id: l.id }, data: { status: 'REJECTED', lastError: item.errors.join('; ') || 'Kanal reddetti' } }); }
+        const publishFlow = l.status === 'PENDING'; // fiyat/stok gönderiminde durum değişmez, yalnızca hata/temizlik
+        if (item.ok) { approved++; await this.prisma.listing.update({ where: { id: l.id }, data: { ...(publishFlow ? { status: 'ACTIVE' } : {}), batchRequestId: null, lastError: null, lastSyncedAt: new Date() } }); }
+        else { rejected++; await this.prisma.listing.update({ where: { id: l.id }, data: { ...(publishFlow ? { status: 'REJECTED' } : {}), batchRequestId: null, lastError: item.errors.join('; ') || 'Kanal reddetti' } }); }
       }
     }
     return { checked: pending.length, approved, rejected, stillPending };
@@ -219,8 +220,9 @@ export class PublishService {
     const l = await this.prisma.listing.findFirst({ where: { id: listingId, channelAccount: { organizationId: user.organizationId } }, include: { channelAccount: { include: { channel: true } }, variant: true } });
     if (!l) throw new NotFoundException('İlan bulunamadı');
     if (data.title && data.title.length > 100) throw new BadRequestException('Başlık en fazla 100 karakter');
-    const price = data.price ?? (l.price != null ? Number(l.price) : undefined);
-    const salePrice = data.salePrice ?? (data.price != null ? data.price : l.salePrice != null ? Number(l.salePrice) : undefined);
+    if ((data.price != null && data.price <= 0) || (data.salePrice != null && data.salePrice <= 0)) throw new BadRequestException('Fiyat 0 veya negatif olamaz');
+    const price = data.price ?? (Number(l.price) || undefined);
+    const salePrice = data.salePrice ?? (data.price != null ? data.price : Number(l.salePrice) || undefined);
     if (price != null && salePrice != null && salePrice > price) throw new BadRequestException('İndirimli fiyat liste fiyatından büyük olamaz');
     const live = !!l.externalId && l.status !== 'DRAFT';
     const adapter = this.registry.get(l.channelAccount.channel.code);

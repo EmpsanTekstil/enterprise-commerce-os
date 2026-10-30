@@ -37,7 +37,7 @@ export default function ListingsPage() {
   const [notice, setNotice] = useState('');
   type Push = { ok: boolean; error?: string; batchRequestId?: string };
   const saveListing = useMutation({
-    mutationFn: () => api<{ pushed: { price?: Push; content?: Push } }>(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title && form.title !== (editing!.title ?? '') ? form.title : undefined, description: form.description && form.description !== (editing!.description ?? '') ? form.description : undefined, price: form.price ? Number(form.price) : undefined, salePrice: form.salePrice ? Number(form.salePrice) : undefined }) }),
+    mutationFn: () => api<{ pushed: { price?: Push; content?: Push } }>(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title && form.title !== (editing!.title ?? '') ? form.title : undefined, description: form.description && form.description !== (editing!.description ?? '') ? form.description : undefined, price: Number(form.price) > 0 ? Number(form.price) : undefined, salePrice: Number(form.salePrice) > 0 ? Number(form.salePrice) : undefined }) }),
     onSuccess: (r) => {
       const ch = editing!.channelAccount.channel.name; const m: string[] = [];
       if (r.pushed?.price) m.push(r.pushed.price.ok ? `Fiyat ${ch}'a gönderildi (dakikalar içinde yansır)` : `Fiyat gönderilemedi: ${r.pushed.price.error}`);
@@ -113,7 +113,7 @@ export default function ListingsPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge>{l.variant && <button className="mt-1 block text-xs text-brand-600 underline" onClick={() => { setEditing(l); setForm({ title: l.title ?? '', description: l.description ?? '', price: l.price ?? '', salePrice: l.salePrice ?? '' }); }}>Düzenle</button>}</td>
+                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge>{l.variant && <button className="mt-1 block text-xs text-brand-600 underline" onClick={() => { setEditing(l); setForm({ title: l.title ?? '', description: l.description ?? '', price: l.price ?? '', salePrice: Number(l.salePrice) > 0 ? l.salePrice! : '' }); }}>Düzenle</button>}</td>
                 </tr>
               ))}
             </tbody>
