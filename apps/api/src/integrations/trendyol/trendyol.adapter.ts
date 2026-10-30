@@ -21,6 +21,18 @@ interface TyPackage {
   cargoProviderName?: string; cargoTrackingNumber?: number | string; cargoTrackingLink?: string; shipmentPackageStatus?: string; lines: TyLine[];
 }
 
+interface TyAttr { attributeId?: number; attributeName?: string; attributeValueId?: number; attributeValue?: string }
+interface TyVariant {
+  variantId?: number; barcode?: string; stockCode?: string; onSale?: boolean; archived?: boolean; locked?: boolean; hasViolation?: boolean; blacklisted?: boolean;
+  commission?: number; vatRate?: number; origin?: string; productUrl?: string; attributes?: TyAttr[];
+  stock?: { quantity?: number }; price?: { salePrice?: number; listPrice?: number; priceSeenByCustomer?: number };
+}
+interface TyContent {
+  contentId?: number; productMainId?: string; title: string; description?: string;
+  brand?: { id?: number; name?: string }; category?: { id?: number; name?: string };
+  images?: { url: string }[]; attributes?: TyAttr[]; variants?: TyVariant[];
+}
+
 export class TrendyolAdapter implements ChannelAdapter {
   readonly code = 'trendyol';
   readonly displayName = 'Trendyol';
@@ -163,34 +175,45 @@ export class TrendyolAdapter implements ChannelAdapter {
 
   async fetchProducts(ctx: AdapterContext, cursor?: string): Promise<PagedResult<ExternalProduct>> {
     const page = Number(cursor ?? 0);
-    const size = 200;
-    interface TyProduct {
-      id?: string; productCode?: number; barcode: string; stockCode?: string; title: string; description?: string; brand?: string;
-      pimCategoryId?: number; listPrice?: number; salePrice?: number; quantity?: number; images?: { url: string }[];
-      attributes?: { attributeName?: string; attributeValue?: string }[]; approved?: boolean; onSale?: boolean; archived?: boolean;
-    }
-    const r = await httpRequest<{ content: TyProduct[]; totalElements: number; totalPages: number }>({
+    const size = 100; // Trendyol: en fazla 100 (INVALID_SIZE)
+    const r = await httpRequest<{ content: TyContent[]; totalElements: number; totalPages: number }>({
       method: 'GET',
       url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products/approved?page=${page}&size=${size}`,
       headers: this.headers(ctx),
     });
-    const items = (r.content ?? []).map<ExternalProduct>((p) => ({
-      externalId: p.barcode, // Trendyol'da ürünün benzersiz anahtarı barkoddur
-      sku: p.stockCode,
-      barcode: p.barcode,
-      title: p.title,
-      description: p.description,
-      brand: p.brand,
-      categoryExternalId: p.pimCategoryId ? String(p.pimCategoryId) : undefined,
-      price: p.listPrice,
-      salePrice: p.salePrice,
-      stock: p.quantity,
-      images: p.images?.map((i) => i.url),
-      attributes: Object.fromEntries((p.attributes ?? []).filter((a) => a.attributeName).map((a) => [a.attributeName!, a.attributeValue ?? ''])),
-      status: p.archived ? 'archived' : p.approved ? (p.onSale ? 'active' : 'paused') : 'pending',
-      raw: p,
-    }));
+    const items = (r.content ?? []).flatMap((c) => TrendyolAdapter.mapContent(c));
     return { items, total: r.totalElements, nextCursor: page + 1 < (r.totalPages ?? 0) ? String(page + 1) : undefined };
+  }
+
+  /**
+   * Product V2 "approved" yanıtı (gerçek hesapla 30.10.2026 doğrulandı): her içerik (contentId) bir renk/model,
+   * barkod, stok, fiyat ve beden gibi varyant özellikleri `variants[]` altındadır. Her varyant ayrı bir ExternalProduct olur;
+   * content özellikleri + varyant özellikleri birleştirilir, groupId = productMainId.
+   */
+  static mapContent(c: TyContent): ExternalProduct[] {
+    const base = Object.fromEntries((c.attributes ?? []).filter((a) => a.attributeName).map((a) => [a.attributeName!, a.attributeValue ?? '']));
+    const images = c.images?.map((i) => i.url);
+    const variants = c.variants?.length ? c.variants : [{} as TyVariant];
+    return variants.filter((v) => v.barcode).map<ExternalProduct>((v) => ({
+      externalId: v.barcode!, // Trendyol'da benzersiz anahtar barkoddur
+      sku: v.stockCode || undefined,
+      barcode: v.barcode,
+      title: c.title,
+      description: c.description,
+      brand: c.brand?.name,
+      brandExternalId: c.brand?.id ? String(c.brand.id) : undefined,
+      groupId: c.productMainId,
+      categoryExternalId: c.category?.id ? String(c.category.id) : undefined,
+      vatRate: v.vatRate,
+      originCountryCode: v.origin,
+      price: v.price?.listPrice,
+      salePrice: v.price?.salePrice,
+      stock: v.stock?.quantity,
+      images,
+      attributes: { ...base, ...Object.fromEntries((v.attributes ?? []).filter((a) => a.attributeName).map((a) => [a.attributeName!, a.attributeValue ?? ''])) },
+      status: v.archived ? 'archived' : v.onSale ? 'active' : 'paused',
+      raw: { contentId: c.contentId, productMainId: c.productMainId, productUrl: v.productUrl, variantId: v.variantId, commission: v.commission, locked: v.locked, hasViolation: v.hasViolation, blacklisted: v.blacklisted },
+    }));
   }
 
   async updateStockAndPrice(ctx: AdapterContext, items: { barcode?: string; stock?: number; price?: number; salePrice?: number }[]): Promise<PushResult[]> {
