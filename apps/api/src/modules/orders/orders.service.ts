@@ -66,31 +66,46 @@ export class OrdersService {
   }
 
   // ---------------- Paketleme iş akışı ----------------
-  /** Toplamaya başlandı / faturalandı bildirimi + yerel durum. */
-  async fulfill(user: JwtPayload, orderId: string, action: 'picking' | 'invoiced', invoiceNumber?: string, trackingNumber?: string) {
+  /** Toplamaya başlandı / faturalandı / kargoya verildi bildirimi + yerel durum. */
+  async fulfill(user: JwtPayload, orderId: string, action: 'picking' | 'invoiced' | 'shipped', invoiceNumber?: string, trackingNumber?: string, carrierCode?: string) {
     const o = await this.prisma.order.findFirst({ where: { id: orderId, organizationId: user.organizationId }, include: { items: true, channelAccount: { include: { channel: true } } } });
     if (!o) throw new NotFoundException('Sipariş bulunamadı');
     if (['CANCELLED', 'RETURNED', 'SHIPPED', 'DELIVERED'].includes(o.status)) throw new BadRequestException(`Bu durumda işlem yapılamaz: ${o.status}`);
     if (action === 'invoiced' && !invoiceNumber) throw new BadRequestException('Fatura numarası gerekli');
+    const existingShipment = await this.prisma.shipment.findFirst({ where: { orderId } });
+    const tracking = trackingNumber ?? (action === 'shipped' ? existingShipment?.trackingNumber ?? undefined : undefined);
+    if (action === 'shipped' && !tracking && !this.registry.get(o.channelAccount.channel.code).fetchShipmentLabel) throw new BadRequestException('Kargoya verildi bildirimi için takip numarası gerekli (kanal etiket üretmiyor)');
     const adapter = this.registry.get(o.channelAccount.channel.code);
     if (adapter.updateShipment) {
       const r = await adapter.updateShipment(this.channels.buildContext(o.channelAccount), o.externalId, {
-        status: action, invoiceNumber, trackingNumber, lines: o.items.filter((i) => i.externalId).map((i) => ({ externalId: i.externalId!, quantity: i.quantity })),
+        status: action, invoiceNumber, trackingNumber: tracking, carrierCode, lines: o.items.filter((i) => i.externalId).map((i) => ({ externalId: i.externalId!, quantity: i.quantity })),
       });
       if (!r.ok) throw new BadRequestException(`Kanal bildirimi başarısız: ${r.error}`);
     }
-    const next: OrderStatus = action === 'picking' ? 'PICKING' : 'PACKED';
+    const next: OrderStatus = action === 'picking' ? 'PICKING' : action === 'invoiced' ? 'PACKED' : 'SHIPPED';
+    const note = action === 'invoiced' ? `Faturalandı: ${invoiceNumber}` : action === 'shipped' ? `Kargoya verildi${tracking ? `: ${tracking}` : ''}` : 'Toplama başladı';
     await this.prisma.$transaction([
       this.prisma.order.update({ where: { id: orderId }, data: { status: next } }),
-      this.prisma.orderStatusHistory.create({ data: { orderId, fromStatus: o.status, toStatus: next, note: action === 'invoiced' ? `Faturalandı: ${invoiceNumber}` : 'Toplama başladı' } }),
+      this.prisma.orderStatusHistory.create({ data: { orderId, fromStatus: o.status, toStatus: next, note } }),
     ]);
-    if (trackingNumber) {
-      const sh = await this.prisma.shipment.findFirst({ where: { orderId } });
-      if (sh) await this.prisma.shipment.update({ where: { id: sh.id }, data: { trackingNumber, status: 'LABEL_CREATED' } });
-      else await this.prisma.shipment.create({ data: { orderId, trackingNumber, status: 'LABEL_CREATED' } });
+    if (tracking || action === 'shipped') {
+      const data = { trackingNumber: tracking ?? existingShipment?.trackingNumber, carrierCode: carrierCode ?? existingShipment?.carrierCode, status: action === 'shipped' ? 'IN_TRANSIT' : 'LABEL_CREATED' } as const;
+      if (existingShipment) await this.prisma.shipment.update({ where: { id: existingShipment.id }, data });
+      else await this.prisma.shipment.create({ data: { orderId, ...data } });
     }
-    await this.audit.log(user, `order.${action}`, 'Order', orderId, { status: o.status }, { status: next, invoiceNumber, trackingNumber });
+    await this.audit.log(user, `order.${action}`, 'Order', orderId, { status: o.status }, { status: next, invoiceNumber, trackingNumber: tracking, carrierCode });
     return this.get(user, orderId);
+  }
+
+  /** Kanalın ürettiği kargo etiketini (PDF/ZPL) getirir; kanal etiket vermiyorsa açık hata. */
+  async label(user: JwtPayload, orderId: string) {
+    const o = await this.prisma.order.findFirst({ where: { id: orderId, organizationId: user.organizationId }, include: { channelAccount: { include: { channel: true } } } });
+    if (!o) throw new NotFoundException('Sipariş bulunamadı');
+    const adapter = this.registry.get(o.channelAccount.channel.code);
+    if (!adapter.fetchShipmentLabel) throw new BadRequestException(`${adapter.displayName} kargo etiketini API ile vermiyor; etiket kanal panelinden alınır.`);
+    const lbl = await adapter.fetchShipmentLabel(this.channels.buildContext(o.channelAccount), o.externalId);
+    await this.audit.log(user, 'order.label', 'Order', orderId, null, { contentType: lbl.contentType, url: lbl.url });
+    return { ...lbl, fileName: lbl.fileName ?? `etiket-${o.orderNumber ?? o.externalId}.${lbl.contentType.includes('pdf') ? 'pdf' : 'txt'}` };
   }
 
   private async upsertOrder(account: Account, adapter: ChannelAdapter, o: ExternalOrder) {

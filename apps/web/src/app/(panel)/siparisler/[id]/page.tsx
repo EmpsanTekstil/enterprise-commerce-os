@@ -20,8 +20,18 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['order', id], queryFn: () => api<Detail>(`/orders/${id}`) });
-  const [inv, setInv] = useState(''); const [trk, setTrk] = useState('');
-  const fulfill = useMutation({ mutationFn: (action: 'picking' | 'invoiced') => api(`/orders/${id}/fulfill`, { method: 'POST', body: JSON.stringify({ action, invoiceNumber: inv || undefined, trackingNumber: trk || undefined }) }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); qc.invalidateQueries({ queryKey: ['orders'] }); } });
+  const [inv, setInv] = useState(''); const [trk, setTrk] = useState(''); const [carrier, setCarrier] = useState('');
+  const fulfill = useMutation({ mutationFn: (action: 'picking' | 'invoiced' | 'shipped') => api(`/orders/${id}/fulfill`, { method: 'POST', body: JSON.stringify({ action, invoiceNumber: inv || undefined, trackingNumber: trk || undefined, carrierCode: carrier || undefined }) }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['order', id] }); qc.invalidateQueries({ queryKey: ['orders'] }); } });
+  const label = useMutation({
+    mutationFn: () => api<{ contentType: string; base64?: string; url?: string; fileName?: string }>(`/orders/${id}/label`),
+    onSuccess: (l) => {
+      if (l.url) { window.open(l.url, '_blank', 'noopener'); return; }
+      if (!l.base64) return;
+      const bytes = Uint8Array.from(atob(l.base64), (c) => c.charCodeAt(0));
+      const href = URL.createObjectURL(new Blob([bytes], { type: l.contentType }));
+      const a = document.createElement('a'); a.href = href; a.download = l.fileName ?? 'etiket'; a.click(); setTimeout(() => URL.revokeObjectURL(href), 10_000);
+    },
+  });
   if (q.error) return <ErrorBox message={(q.error as Error).message} />;
   if (!q.data) return <div className="text-sm text-slate-500">Yükleniyor…</div>;
   const o = q.data; const p = o.profitEstimate;
@@ -33,15 +43,24 @@ export default function OrderDetailPage() {
         <Badge tone={ORDER_STATUS[o.status]?.t ?? 'neutral'}>{ORDER_STATUS[o.status]?.l ?? o.status}</Badge>
         <span className="text-sm text-slate-500">{o.channelAccount.channel.name} · {o.channelAccount.label} · {new Date(o.orderedAt).toLocaleString('tr-TR')}</span>
       </div>
-      {['NEW', 'CONFIRMED', 'PICKING'].includes(o.status) && (
+      {['NEW', 'CONFIRMED', 'PICKING', 'PACKED'].includes(o.status) && (
         <section className="card flex flex-wrap items-end gap-2 text-sm">
           <div className="font-medium">Paketleme</div>
-          {o.status !== 'PICKING' && <button className="btn-secondary" disabled={fulfill.isPending} onClick={() => fulfill.mutate('picking')}>Toplamaya başla</button>}
-          <div><label className="label">Fatura no</label><input className="input w-44" value={inv} onChange={(e) => setInv(e.target.value)} /></div>
-          <div><label className="label">Takip no (kendi kargon varsa)</label><input className="input w-44" value={trk} onChange={(e) => setTrk(e.target.value)} /></div>
-          <button className="btn-primary" disabled={!inv || fulfill.isPending} onClick={() => { if (confirm('Kanala "faturalandı/paketlendi" bildirilecek. Devam?')) fulfill.mutate('invoiced'); }}>Faturalandı · Paketlendi</button>
+          {['NEW', 'CONFIRMED'].includes(o.status) && <button className="btn-secondary" disabled={fulfill.isPending} onClick={() => fulfill.mutate('picking')}>Toplamaya başla</button>}
+          {o.status !== 'PACKED' && <>
+            <div><label className="label">Fatura no</label><input className="input w-44" value={inv} onChange={(e) => setInv(e.target.value)} /></div>
+            <div><label className="label">Takip no (kendi kargon varsa)</label><input className="input w-44" value={trk} onChange={(e) => setTrk(e.target.value)} /></div>
+            <button className="btn-primary" disabled={!inv || fulfill.isPending} onClick={() => { if (confirm('Kanala "faturalandı/paketlendi" bildirilecek. Devam?')) fulfill.mutate('invoiced'); }}>Faturalandı · Paketlendi</button>
+          </>}
+          {o.status === 'PACKED' && <>
+            <div><label className="label">Takip no</label><input className="input w-44" value={trk} onChange={(e) => setTrk(e.target.value)} placeholder={o.shipments[0]?.trackingNumber ?? ''} /></div>
+            <div><label className="label">Kargo firması kodu</label><input className="input w-36" value={carrier} onChange={(e) => setCarrier(e.target.value)} placeholder="yurtici, aras…" /></div>
+            <button className="btn-primary" disabled={fulfill.isPending} onClick={() => { if (confirm('Kanala "kargoya verildi" bildirilecek. Devam?')) fulfill.mutate('shipped'); }}>Kargoya verildi</button>
+          </>}
+          <button className="btn-secondary" disabled={label.isPending} onClick={() => label.mutate()}>Kanal etiketini indir</button>
           {fulfill.error && <ErrorBox message={(fulfill.error as Error).message} />}
-          <div className="w-full text-xs text-slate-500">Trendyol'da kargo etiketi kanal tarafından üretilir; takip numarası yalnızca kendi kargo anlaşmanız varsa girilir.</div>
+          {label.error && <ErrorBox message={(label.error as Error).message} />}
+          <div className="w-full text-xs text-slate-500">Trendyol ve Hepsiburada'da kargo etiketi kanal tarafından üretilir (buradan indirilir); takip numarası ve kargo firması yalnızca kendi kargo anlaşmanız varsa (n11, idefix, Amazon, Shopify) girilir.</div>
         </section>
       )}
       <div className="grid gap-4 lg:grid-cols-3">

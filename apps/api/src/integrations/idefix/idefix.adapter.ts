@@ -15,12 +15,12 @@ export class IdefixAdapter implements ChannelAdapter {
 
   readonly capabilities: CapabilityMatrix = {
     'products.read':   { status: 'supported', docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/urunlerim-listesi' },
-    'products.create': { status: 'planned',   docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/urun-olusturma', note: 'Kargo profili/adres kimlikleri gerekir' },
+    'products.create': { status: 'supported', docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/urun-olusturma', note: 'POST /pim/pool/{vendorId}/create, batchRequestId; cargoCompanyId hesap ayarından. Trendyol türevi şema, gerçek hesapla teyit' },
     'products.update': { status: 'planned',   docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/urun-olusturma' },
     'stock.update':    { status: 'supported', docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/stok-ve-fiyat-gonderim', note: 'inventory-upload, batchRequestId' },
     'price.update':    { status: 'supported', docUrl: 'https://developer.idefix.com/api/urun-entegrasyonu/stok-ve-fiyat-gonderim' },
     'orders.read':     { status: 'supported', docUrl: 'https://developer.idefix.com/api/siparis-entegrasyonu/siparislerin-alinmasi' },
-    'shipping.update': { status: 'planned',   docUrl: 'https://developer.idefix.com/api/siparis-entegrasyonu/siparis-statu-guncelleme' },
+    'shipping.update': { status: 'supported', docUrl: 'https://developer.idefix.com/api/siparis-entegrasyonu/siparis-statu-guncelleme', note: 'picking/invoiced: update-shipment-status; shipped: update-tracking-number (trackingUrl zorunlu, trackingUrlTemplate ayarı). Etiket API yok, kargo firması paneli' },
     'returns.read':    { status: 'planned',   docUrl: 'https://developer.idefix.com/api/siparis-entegrasyonu/iade-listesi' },
     'returns.update':  { status: 'planned',   docUrl: 'https://developer.idefix.com/api/siparis-entegrasyonu/iade-onaylama' },
     'questions.read':  { status: 'planned',   docUrl: 'https://developer.idefix.com/api/soru-cevap-entegrasyonu' },
@@ -72,10 +72,60 @@ export class IdefixAdapter implements ChannelAdapter {
     } catch (e) { return payload.map((p) => ({ ok: false, externalId: p.barcode, error: (e as Error).message })); }
   }
 
+  /** Ürün oluşturma: POST /pim/pool/{vendorId}/create → batchRequestId (checkBatch için "pool:" önekiyle döner). cargoCompanyId hesap ayarından zorunlu; shipmentAddressId/returnAddressId varsa eklenir. */
+  async createProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    const s = ctx.settings; const cargoCompanyId = s.cargoCompanyId != null && s.cargoCompanyId !== '' ? Number(s.cargoCompanyId) : undefined;
+    if (!cargoCompanyId) return products.map((p) => ({ ok: false, externalId: p.barcode ?? p.externalId, error: 'idefix için hesap ayarlarında "cargoCompanyId" (kargo firması kimliği) gerekli' }));
+    const missing = products.filter((p) => !p.barcode || !p.brandExternalId || !p.categoryExternalId);
+    if (missing.length) return products.map((p) => ({ ok: false, externalId: p.barcode ?? p.externalId, error: missing.includes(p) ? 'idefix için barcode, brandExternalId ve categoryExternalId zorunlu' : 'Aynı partideki diğer ürünler eksik; gönderilmedi' }));
+    const payload = products.map((p) => ({
+      barcode: p.barcode, title: p.title, productMainId: p.groupId ?? p.sku ?? p.externalId, brandId: Number(p.brandExternalId), categoryId: Number(p.categoryExternalId),
+      inventoryQuantity: p.stock ?? 0, vendorStockCode: p.sku ?? p.externalId, description: p.description ?? p.title,
+      price: p.salePrice ?? p.price ?? 0, ...(p.price !== undefined && p.salePrice !== undefined && p.price > p.salePrice ? { comparePrice: p.price } : {}), vatRate: Math.round(p.vatRate ?? 20),
+      ...(p.weightGrams ? { weight: p.weightGrams / 1000, desi: Math.max(1, Math.ceil(p.weightGrams / 1000)) } : {}),
+      cargoCompanyId, ...(s.shipmentAddressId ? { shipmentAddressId: Number(s.shipmentAddressId) } : {}), ...(s.returningAddressId ?? s.returnAddressId ? { returnAddressId: Number(s.returningAddressId ?? s.returnAddressId) } : {}),
+      images: (p.images ?? []).map((url) => ({ url })),
+      attributes: (p.channelAttributes ?? []).map((a) => ({ attributeId: Number(a.attributeId), ...(a.valueId ? { attributeValueId: Number(a.valueId) } : {}), ...(a.customValue ? { customAttributeValue: a.customValue } : {}) })),
+    }));
+    try {
+      const r = await httpRequest<{ batchRequestId: string; status?: string }>({ method: 'POST', url: `${this.baseUrl}/pim/pool/${this.vendor(ctx)}/create`, headers: this.headers(ctx), body: { products: payload } });
+      const ok = !/fail|cancel/i.test(r.status ?? '');
+      return payload.map((p) => ({ ok, externalId: p.barcode, batchRequestId: `pool:${r.batchRequestId}`, error: ok ? undefined : r.status }));
+    } catch (e) { return payload.map((p) => ({ ok: false, externalId: p.barcode, error: (e as Error).message })); }
+  }
+
+  /** "pool:{id}" → ürün oluşturma sonucu (/pim/pool/.../batch-result), aksi hâlde stok-fiyat sonucu (/pim/catalog/.../inventory-result). */
   async checkBatch(ctx: AdapterContext, batchRequestId: string): Promise<BatchStatus> {
-    interface R { status: string; items?: { barcode: string; status: string; failureReasons?: string[] }[] }
-    const r = await httpRequest<R>({ method: 'GET', url: `${this.baseUrl}/pim/catalog/${this.vendor(ctx)}/inventory-result/${batchRequestId}`, headers: this.headers(ctx) });
-    return { done: !/progress|queue|pending/i.test(r.status ?? ''), items: (r.items ?? []).map((i) => ({ externalId: i.barcode, ok: /completed|success/i.test(i.status), errors: i.failureReasons ?? (/completed|success/i.test(i.status) ? [] : [i.status]) })), raw: r };
+    interface I { barcode: string; status: string; failureReasons?: string[] }
+    interface R { status: string; items?: I[]; products?: I[] }
+    const pool = batchRequestId.startsWith('pool:'); const id = pool ? batchRequestId.slice(5) : batchRequestId;
+    const r = await httpRequest<R>({ method: 'GET', url: pool ? `${this.baseUrl}/pim/pool/${this.vendor(ctx)}/batch-result/${id}` : `${this.baseUrl}/pim/catalog/${this.vendor(ctx)}/inventory-result/${id}`, headers: this.headers(ctx) });
+    const okRe = pool ? /completed|success|ready_for_sale|waiting_|matched/i : /completed|success/i;
+    return { done: !/progress|queue|pending|created|running/i.test(r.status ?? ''), items: (r.products ?? r.items ?? []).map((i) => ({ externalId: i.barcode, ok: okRe.test(i.status), errors: i.failureReasons?.length ? i.failureReasons : okRe.test(i.status) ? [] : [i.status] })), raw: r };
+  }
+
+  /**
+   * Sipariş statü güncelleme. orderExternalId = shipmentId (fetchOrders'daki externalId).
+   * picking/invoiced → POST /oms/{vendorId}/{shipmentId}/update-shipment-status {status, invoiceNumber}
+   * shipped → POST /oms/{vendorId}/{shipmentId}/update-tracking-number {trackingNumber, trackingUrl}; trackingUrl zorunlu, siparişteki kargo profiliyle eşleşmeli → ayar: trackingUrlTemplate ("{trackingNumber}" yer tutucu). Statü otomatik shipment_in_cargo olur.
+   */
+  async updateShipment(ctx: AdapterContext, orderExternalId: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string; carrierCode?: string }): Promise<PushResult> {
+    const base = `${this.baseUrl}/oms/${this.vendor(ctx)}/${encodeURIComponent(orderExternalId)}`;
+    try {
+      if (data.status === 'shipped') {
+        if (!data.trackingNumber) return { ok: false, externalId: orderExternalId, error: 'idefix kargo bildirimi için trackingNumber gerekli' };
+        const tpl = String(ctx.settings.trackingUrlTemplate ?? '');
+        if (!tpl) return { ok: false, externalId: orderExternalId, error: 'idefix için hesap ayarlarında "trackingUrlTemplate" (ör. https://kargo.example/takip?no={trackingNumber}) gerekli; trackingUrl zorunlu alandır' };
+        await httpRequest({ method: 'POST', url: `${base}/update-tracking-number`, headers: this.headers(ctx), body: { trackingNumber: data.trackingNumber, trackingUrl: tpl.replace('{trackingNumber}', encodeURIComponent(data.trackingNumber)) } });
+        return { ok: true, externalId: orderExternalId };
+      }
+      if (data.status === 'picking' || data.status === 'invoiced') {
+        if (data.status === 'invoiced' && !data.invoiceNumber) return { ok: false, externalId: orderExternalId, error: 'idefix "invoiced" statüsü için invoiceNumber gerekli' };
+        await httpRequest({ method: 'POST', url: `${base}/update-shipment-status`, headers: this.headers(ctx), body: { status: data.status, ...(data.invoiceNumber ? { invoiceNumber: data.invoiceNumber } : {}) } });
+        return { ok: true, externalId: orderExternalId };
+      }
+      return { ok: false, externalId: orderExternalId, error: `idefix için desteklenmeyen statü: ${data.status ?? '(boş)'}` };
+    } catch (e) { return { ok: false, externalId: orderExternalId, error: (e as Error).message }; }
   }
 
   mapOrderStatus(s: string) {

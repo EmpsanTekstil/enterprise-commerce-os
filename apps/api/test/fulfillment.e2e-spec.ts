@@ -36,6 +36,16 @@ describe('Paketleme, webhook ve stok (e2e)', () => {
     expect(r2.body.history.map((h: { toStatus: string }) => h.toStatus)).toEqual(['NEW', 'PICKING', 'PACKED']);
   });
 
+  it('kanal etiketi indirilir; kargoya verildi bildirimi kanala gider ve sipariş SHIPPED olur', async () => {
+    const l = await get(`/orders/${orderId}/label`).expect(200);
+    expect(l.body.contentType).toBe('application/pdf'); expect(Buffer.from(l.body.base64, 'base64').toString()).toContain('PKG-1001'); expect(l.body.fileName).toMatch(/\.pdf$/);
+    const r = await post(`/orders/${orderId}/fulfill`, { action: 'shipped', carrierCode: 'yurtici' }).expect(201);
+    expect(r.body.status).toBe('SHIPPED');
+    expect(MockAdapter.shipmentUpdates.at(-1)).toMatchObject({ id: 'PKG-1001', data: { status: 'shipped', trackingNumber: 'TRK123', carrierCode: 'yurtici' } });
+    expect(r.body.shipments[0]).toMatchObject({ trackingNumber: 'TRK123', carrierCode: 'yurtici', status: 'IN_TRANSIT' });
+    await post(`/orders/${orderId}/fulfill`, { action: 'picking' }).expect(400); // SHIPPED sonrası işlem yok
+  });
+
   it('webhook anahtarı üretilir; yanlış anahtar reddedilir; doğru anahtarla sipariş güncellenir (idempotent)', async () => {
     const k = await post(`/channels/accounts/${accountId}/webhook-key`).expect(201);
     webhookKey = k.body.key; expect(k.body.url).toContain(`/webhooks/mock/${accountId}`);

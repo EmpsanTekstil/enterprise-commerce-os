@@ -167,6 +167,9 @@ export interface BatchStatus {
 
 export interface ExternalBrand { externalId: string; name: string }
 
+/** Kargo etiketi: ya doğrudan içerik (base64) ya da kanalın verdiği indirme bağlantısı. */
+export interface ShipmentLabel { contentType: string; base64?: string; url?: string; fileName?: string }
+
 export interface ChannelAttributeDef {
   id: string;
   name: string;
@@ -213,6 +216,8 @@ export interface ChannelAdapter {
   fetchOrders?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalOrder>>;
   /** Paket durumu / kargo bildirimi. status: 'picking' | 'invoiced' | 'shipped'; lines: paket kalemleri (kanal kalem kimliği + adet). */
   updateShipment?(ctx: AdapterContext, orderExternalId: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string; carrierCode?: string }): Promise<PushResult>;
+  /** Kanalın ürettiği kargo etiketi/barkodu (PDF veya ZPL). Kanal etiket vermiyorsa tanımsız bırakılır. */
+  fetchShipmentLabel?(ctx: AdapterContext, orderExternalId: string): Promise<ShipmentLabel>;
   /** Kanalın webhook ile gönderdiği gövdeyi normalize siparişlere çevirir. */
   parseWebhook?(payload: unknown): ExternalOrder[];
 

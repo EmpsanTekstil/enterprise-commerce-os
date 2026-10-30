@@ -1,6 +1,6 @@
 import {
   AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalCategory, ExternalOrder, ExternalProduct,
-  ExternalReturn, PagedResult, PushResult,
+  ExternalReturn, PagedResult, PushResult, ShipmentLabel,
 } from '../adapter.interface';
 import { HttpError, httpRequest } from '../http-client';
 
@@ -18,12 +18,12 @@ export class HepsiburadaAdapter implements ChannelAdapter {
 
   readonly capabilities: CapabilityMatrix = {
     'products.read':   { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'Listing API: listings/merchantid/{id} (ikincil kaynaktan doğrulandı)' },
-    'products.create': { status: 'planned',   docUrl: 'https://developers.hepsiburada.com', note: 'MPOP product/api/products/import (katalog eşleştirme + onay süreci)' },
+    'products.create': { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'MPOP product/api/products/import (multipart JSON; ikincil kaynaktan, gerçek hesapla teyit edilecek)' },
     'products.update': { status: 'planned',   docUrl: 'https://developers.hepsiburada.com' },
     'stock.update':    { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'inventory-uploads (XML), asenkron id ile sorgulanır' },
     'price.update':    { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'inventory-uploads' },
     'orders.read':     { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'OMS orders + packages' },
-    'shipping.update': { status: 'planned',   docUrl: 'https://developers.hepsiburada.com', note: 'packages (paketleme), invoice, label, deliver' },
+    'shipping.update': { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'OMS packages (paketleme), invoice, etiket PDF, deliver (ownCargo)' },
     'returns.read':    { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'claims/merchantid/{id}' },
     'returns.update':  { status: 'supported', docUrl: 'https://developers.hepsiburada.com', note: 'claims/number/{no}/accept | reject' },
     'questions.read':  { status: 'unverified', note: 'İstemcide soru-cevap servisi yok; portalda doğrulanacak' },
@@ -103,12 +103,84 @@ export class HepsiburadaAdapter implements ChannelAdapter {
     } catch (e) { return items.map((i) => ({ ok: false, externalId: i.externalId, error: (e as Error).message })); }
   }
 
+  /** MPOP katalog içe aktarma: JSON dizisi multipart dosya ('file') olarak gönderilir; yanıttaki trackingId 'mpop:' önekiyle batchRequestId olur. */
+  async createProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    const rows = products.map((p) => {
+      const attrs: Record<string, unknown> = { merchantSku: p.sku, Barcode: p.barcode, UrunAdi: p.title, UrunAciklamasi: p.description, Marka: p.brand, GarantiSuresi: ctx.settings.warrantyMonths ?? 24, kg: p.weightGrams !== undefined ? p.weightGrams / 1000 : undefined, tax_vat_rate: p.vatRate, price: p.salePrice ?? p.price, stock: p.stock };
+      (p.images ?? []).slice(0, 5).forEach((u, i) => { attrs[`Image${i + 1}`] = u; });
+      for (const a of p.channelAttributes ?? []) attrs[a.attributeId] = a.valueId ?? a.customValue;
+      for (const k of Object.keys(attrs)) if (attrs[k] === undefined) delete attrs[k];
+      return { categoryId: Number(p.categoryExternalId) || p.categoryExternalId, merchant: this.mid(ctx), attributes: attrs };
+    });
+    try {
+      const form = new FormData();
+      form.append('file', new Blob([JSON.stringify(rows)], { type: 'application/json' }), 'products.json');
+      const res = await fetch(`${this.host(ctx, 'mpop')}/product/api/products/import`, { method: 'POST', headers: this.headers(ctx), body: form });
+      const text = await res.text();
+      if (!res.ok) throw new HttpError(res.status, text, 'products/import');
+      const j = (() => { try { return JSON.parse(text) as { trackingId?: string; data?: { trackingId?: string } }; } catch { return {}; } })();
+      const id = j.trackingId ?? j.data?.trackingId;
+      if (!id) return products.map((p) => ({ ok: false, externalId: p.barcode ?? p.sku, error: `MPOP yanıtında trackingId yok: ${text.slice(0, 200)}` }));
+      return products.map((p) => ({ ok: true, externalId: p.barcode ?? p.sku, batchRequestId: `mpop:${id}` }));
+    } catch (e) { return products.map((p) => ({ ok: false, externalId: p.barcode ?? p.sku, error: (e as Error).message })); }
+  }
+
   async checkBatch(ctx: AdapterContext, id: string): Promise<BatchStatus> {
+    if (id.startsWith('mpop:')) return this.checkMpopBatch(ctx, id.slice(5));
     interface R { status?: string; errors?: { hepsiburadaSku?: string; merchantSku?: string; message?: string }[]; items?: { hepsiburadaSku?: string; status?: string; message?: string }[] }
     const r = await httpRequest<R>({ method: 'GET', url: `${this.host(ctx, 'listing')}/listings/merchantid/${this.mid(ctx)}/inventory-uploads/id/${id}`, headers: this.headers(ctx) });
     const done = !/progress|pending|queue/i.test(r.status ?? '');
     const errs = new Map((r.errors ?? []).map((e) => [e.hepsiburadaSku ?? e.merchantSku ?? '', e.message ?? 'hata']));
     return { done, items: [...(r.items ?? []).map((i) => ({ externalId: i.hepsiburadaSku ?? '', ok: !/fail|error/i.test(i.status ?? '') && !errs.has(i.hepsiburadaSku ?? ''), errors: [errs.get(i.hepsiburadaSku ?? '') ?? i.message].filter(Boolean) as string[] })), ...[...errs.entries()].filter(([k]) => !(r.items ?? []).some((i) => i.hepsiburadaSku === k)).map(([k, m]) => ({ externalId: k, ok: false, errors: [m] }))], raw: r };
+  }
+
+  /** MPOP içe aktarma durumu: status Done/Completed/Failed → bitti; her ürün barkod (yoksa merchantSku) ile raporlanır. */
+  private async checkMpopBatch(ctx: AdapterContext, trackingId: string): Promise<BatchStatus> {
+    interface Item { barcode?: string; merchantSku?: string; status?: string; errors?: (string | { message?: string })[]; validationResults?: (string | { message?: string })[]; message?: string; attributes?: { Barcode?: string; merchantSku?: string } }
+    interface R { status?: string; data?: { status?: string; items?: Item[]; products?: Item[] }; items?: Item[]; products?: Item[] }
+    const r = await httpRequest<R>({ method: 'GET', url: `${this.host(ctx, 'mpop')}/product/api/products/status/${encodeURIComponent(trackingId)}?version=1`, headers: this.headers(ctx) });
+    const status = r.data?.status ?? r.status ?? '';
+    const done = /^(done|completed|failed)$/i.test(status);
+    const list = r.data?.items ?? r.data?.products ?? r.items ?? r.products ?? [];
+    const items = list.map((i) => {
+      const errors = [...(i.errors ?? []), ...(i.validationResults ?? [])].map((e) => (typeof e === 'string' ? e : e.message ?? '')).filter(Boolean);
+      if (!errors.length && /fail|error|reject/i.test(i.status ?? '')) errors.push(i.message ?? i.status ?? 'hata');
+      return { externalId: i.barcode ?? i.attributes?.Barcode ?? i.merchantSku ?? i.attributes?.merchantSku ?? '', ok: !errors.length, errors };
+    });
+    return { done, items, raw: r };
+  }
+
+  /** OMS: picking → paketle; invoiced → fatura no; shipped → ownCargo ise deliver, değilse etiket yeterli. */
+  async updateShipment(ctx: AdapterContext, packageNumber: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string; carrierCode?: string }): Promise<PushResult> {
+    const base = `${this.host(ctx, 'oms')}/packages/merchantid/${this.mid(ctx)}`; const no = encodeURIComponent(packageNumber);
+    try {
+      if (data.status === 'picking') {
+        if (!data.lines?.length) return { ok: false, error: 'Paketleme için sipariş kalemleri (lines) gerekli' };
+        const r = await httpRequest<{ packageNumber?: string }>({ method: 'POST', url: base, headers: this.headers(ctx), body: { lineItemRequests: data.lines.map((l) => ({ id: l.externalId, quantity: l.quantity })) } });
+        return { ok: true, externalId: r?.packageNumber ?? packageNumber };
+      }
+      if (data.status === 'invoiced') {
+        if (!data.invoiceNumber) return { ok: false, error: 'Fatura bildirimi için invoiceNumber gerekli' };
+        await httpRequest({ method: 'PUT', url: `${base}/packagenumber/${no}/invoice`, headers: this.headers(ctx), body: { invoiceNumber: data.invoiceNumber } });
+        return { ok: true, externalId: packageNumber };
+      }
+      if (data.status === 'shipped') {
+        if (!ctx.settings.ownCargo) return { ok: true, externalId: packageNumber }; // Hepsiburada anlaşmalı kargoda etiket yeterli
+        if (!data.trackingNumber) return { ok: false, error: 'Kendi kargonuzla teslimat bildirimi için trackingNumber gerekli' };
+        await httpRequest({ method: 'POST', url: `${base}/packagenumber/${no}/deliver`, headers: this.headers(ctx), body: { trackingNumber: data.trackingNumber, cargoCompany: data.carrierCode } });
+        return { ok: true, externalId: packageNumber };
+      }
+      return { ok: false, error: `Bilinmeyen paket durumu: ${String(data.status)}` };
+    } catch (e) { return { ok: false, externalId: packageNumber, error: (e as Error).message }; }
+  }
+
+  /** OMS etiket PDF'i; ikili yanıt için doğrudan fetch. */
+  async fetchShipmentLabel(ctx: AdapterContext, packageNumber: string): Promise<ShipmentLabel> {
+    const res = await fetch(`${this.host(ctx, 'oms')}/packages/merchantid/${this.mid(ctx)}/packagenumber/${encodeURIComponent(packageNumber)}/labels?format=pdf`, { method: 'GET', headers: this.headers(ctx, 'application/pdf') });
+    if (!res.ok) throw new HttpError(res.status, await res.text(), 'labels');
+    const base64 = Buffer.from(await res.arrayBuffer()).toString('base64');
+    if (!base64) throw new Error(`Hepsiburada ${packageNumber} paketi için etiket boş döndü`);
+    return { contentType: 'application/pdf', base64, fileName: `hb-${packageNumber}.pdf` };
   }
 
   mapOrderStatus(s: string) {

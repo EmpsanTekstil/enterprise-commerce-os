@@ -1,5 +1,5 @@
 import {
-  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalAdMetric, ExternalCampaign, ExternalCategory, ExternalOrder, ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult,
+  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalAdMetric, ExternalCampaign, ExternalCategory, ExternalOrder, ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult, ShipmentLabel,
 } from '../adapter.interface';
 
 /**
@@ -61,6 +61,7 @@ export class MockAdapter implements ChannelAdapter {
   }
 
   async updateShipment(_c: AdapterContext, id: string, data: unknown): Promise<PushResult> { MockAdapter.shipmentUpdates.push({ id, data }); return { ok: true }; }
+  async fetchShipmentLabel(_c: AdapterContext, id: string): Promise<ShipmentLabel> { return { contentType: 'application/pdf', base64: Buffer.from('%PDF-1.4 test ' + id).toString('base64'), fileName: 'etiket-' + id + '.pdf' }; }
   parseWebhook(payload: unknown): ExternalOrder[] { const b = payload as { orders?: ExternalOrder[] }; return (b.orders ?? []).map((o) => ({ ...o, orderedAt: new Date(o.orderedAt) })); }
   async fetchQuestions(): Promise<PagedResult<ExternalQuestion>> { return { items: MockAdapter.questions, total: MockAdapter.questions.length }; }
   async answerQuestion(_c: AdapterContext, id: string, text: string): Promise<PushResult> { MockAdapter.answers.push({ id, text }); return { ok: true }; }

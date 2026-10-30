@@ -22,7 +22,7 @@ export class N11Adapter implements ChannelAdapter {
     'stock.update':    { status: 'supported', docUrl: 'https://developer.n11.com/documentation/n11-marketplace-entegrasyonu/urun-fiyat-stok-guncelleme/', note: 'Asenkron task; 1000 SKU/istek' },
     'price.update':    { status: 'supported', docUrl: 'https://developer.n11.com/documentation/n11-marketplace-entegrasyonu/urun-fiyat-stok-guncelleme/', note: 'listPrice ≥ salePrice, birlikte gönderilir' },
     'orders.read':     { status: 'supported', docUrl: 'https://developer.n11.com/documentation/elements/siparis-listeleme-servisi/', note: 'sayfa 100, 1000 istek/dk' },
-    'shipping.update': { status: 'planned',   docUrl: 'https://developer.n11.com/documentation/elements/siparis-listeleme-servisi/', note: 'Sipariş kalemi güncelleme servisi' },
+    'shipping.update': { status: 'supported', docUrl: 'https://developer.n11.com/documentation/n11-siparis-entegrasyonu/siparis-kalemlerini-guncelleme-servisi/', note: 'PUT /rest/order/v1/update; dokümanda yalnız Picking var. Shipped+takip no alanları doğrulanmadı, gerçek hesapla teyit' },
     'returns.read':    { status: 'planned',   docUrl: 'https://developer.n11.com/documentation/iade-entgrasyonu/iade-talepleri-servisi/' },
     'returns.update':  { status: 'planned' },
     'questions.read':  { status: 'supported', docUrl: 'https://developer.n11.com/documentation/n11-marketplace-entegrasyonu/urun-soru-cevap-servisi/', note: 'SOAP; dakikada 1 listeleme' },
@@ -138,6 +138,26 @@ export class N11Adapter implements ChannelAdapter {
     });
     const totalPages = r.totalPages ?? r.pageCount ?? 0;
     return { items, nextCursor: page + 1 < totalPages ? String(page + 1) : undefined };
+  }
+
+  /**
+   * Sipariş kalemi güncelleme: PUT /rest/order/v1/update {lines:[{lineId}], status}. lineId = orderLineId (fetchOrders'daki kalem externalId).
+   * Resmî dokümanda yalnız "Picking" tanımlı. "shipped" için trackingNumber/shipmentCompany alanları dokümanda yok — doğrulanmadı, gerçek hesapla teyit.
+   * "invoiced": n11'de karşılığı yok (fatura ayrı "Fatura Linki Gönderme" servisi) → ok:true, işlem yapılmaz.
+   */
+  async updateShipment(ctx: AdapterContext, orderExternalId: string, data: { status?: 'picking' | 'invoiced' | 'shipped'; lines?: { externalId: string; quantity: number }[]; invoiceNumber?: string; trackingNumber?: string; carrierCode?: string }): Promise<PushResult> {
+    if (data.status === 'invoiced') return { ok: true, externalId: orderExternalId };
+    if (data.status !== 'picking' && data.status !== 'shipped') return { ok: false, externalId: orderExternalId, error: `n11 için desteklenmeyen statü: ${data.status ?? '(boş)'}` };
+    if (data.status === 'shipped' && !data.trackingNumber) return { ok: false, externalId: orderExternalId, error: 'n11 kargo bildirimi için trackingNumber gerekli' };
+    const ids = (data.lines ?? []).map((l) => Number(l.externalId)).filter((n) => Number.isFinite(n) && n > 0);
+    if (!ids.length) return { ok: false, externalId: orderExternalId, error: 'n11 kalem güncelleme için lines (orderLineId) gerekli' };
+    const shipmentCompany = data.carrierCode ?? (ctx.settings.shipmentCompany ? String(ctx.settings.shipmentCompany) : undefined);
+    const lines = ids.map((lineId) => data.status === 'shipped' ? { lineId, trackingNumber: data.trackingNumber, ...(shipmentCompany ? { shipmentCompany } : {}) } : { lineId });
+    try {
+      const r = await httpRequest<{ content?: { lineId: number; status?: string; reasons?: string }[] }>({ method: 'PUT', url: `${this.baseUrl}/rest/order/v1/update`, headers: this.headers(ctx), body: { lines, status: data.status === 'shipped' ? 'Shipped' : 'Picking' } });
+      const failed = (r.content ?? []).filter((c) => (c.status ?? '').toUpperCase() !== 'SUCCESS');
+      return failed.length ? { ok: false, externalId: orderExternalId, error: failed.map((c) => `${c.lineId}: ${c.reasons ?? c.status}`).join('; ') } : { ok: true, externalId: orderExternalId };
+    } catch (e) { return { ok: false, externalId: orderExternalId, error: (e as Error).message }; }
   }
 
   // ---------------- SOAP soru-cevap ----------------

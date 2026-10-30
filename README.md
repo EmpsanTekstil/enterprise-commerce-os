@@ -4,7 +4,7 @@ Türkiye pazaryerleri (Trendyol, Hepsiburada, Amazon TR, n11, idefix…) ve kend
 
 Belgeler: [PRD](docs/01-PRD.md) · [Mimari](docs/02-MIMARI.md) · [ER Diyagramı](docs/03-ER-DIYAGRAMI.md) · [Kanal API Yetenek Matrisi](docs/04-KANAL-API-YETENEK-MATRISI.md) · [Canlıya Alma](docs/05-CANLIYA-ALMA.md)
 
-**Durum:** 22 menü ekranının tamamı çalışır; 97 otomatik test (22 birim + 68 API uçtan uca + 7 tarayıcı/Playwright) her push'ta gerçek PostgreSQL ve gerçek tarayıcıda koşar; Docker imajları CI'da derlenir. Kanal adaptörleri: Trendyol (tam), Hepsiburada, n11, idefix, Shopify, Amazon TR (okuma/stok-fiyat/sipariş; gerçek hesaplarla doğrulanacak).
+**Durum:** 22 menü ekranının tamamı çalışır; 126 otomatik test (50 birim + 69 API uçtan uca + 7 tarayıcı/Playwright) her push'ta gerçek PostgreSQL ve gerçek tarayıcıda koşar; Docker imajları CI'da derlenir. Kanal adaptörleri: Trendyol (tam), Hepsiburada, n11, idefix (okuma, stok-fiyat, sipariş, ürün yayınlama, paketleme/kargo), Shopify, Amazon TR (rapor tabanlı ürün çekme, stok-fiyat, sipariş, kargo onayı, Ads API); Trendyol dışındakiler gerçek hesaplarla doğrulanacak.
 
 ---
 
@@ -108,6 +108,6 @@ infra/     Dockerfile'lar
 - [x] Faz 10 devam — Üretim Dockerfile'ları (sağlık kontrolü), Caddy ile otomatik HTTPS, yedekleme/geri yükleme betikleri, canlıya alma rehberi; CI'da Docker imajları derleniyor
 - [x] Faz 5 devam — Shopify adaptörü (GraphQL: ürün/varyant, stok, fiyat, sipariş) ve Amazon TR adaptörü (LWA, sipariş, stok/fiyat; geliştirici onayı gerekir)
 - [x] Faz 5 — Hepsiburada adaptörü (Listing/OMS/MPOP: ilan okuma, stok-fiyat, sipariş paketleri, iade onay/ret, kategori; ikincil kaynaktan, gerçek hesapla teyit edilecek)
-- [ ] Faz 5 son — Amazon rapor tabanlı ürün çekme + Ads API; Hepsiburada/n11/idefix ürün yayınlama; kanal bazlı paketleme/etiket
+- [x] Faz 5 son — Amazon rapor tabanlı ürün çekme (GET_MERCHANT_LISTINGS_ALL_DATA) + Ads API (kampanya, günlük rapor, bütçe/durdurma) + kargo onayı; Hepsiburada (MPOP) ve idefix ürün yayınlama + toplu sonuç takibi; kanal bazlı paketleme: Hepsiburada paket/fatura/etiket PDF, idefix durum + takip no, n11 kargo bildirimi, Amazon confirmShipment; sipariş ekranında "Kargoya verildi" ve "Kanal etiketini indir" — tümü gerçek hesapla teyit edilecek
 - [x] Faz 10 — Playwright arayüz testleri (giriş, ürün oluşturma, entegrasyon ekleme/bağlantı testi, tüm menü), oran sınırı ortamdan ayarlanabilir
 - [ ] Faz 10 son — KVKK veri saklama ayarları (müşteri verisi maskeleme/silme süresi)
