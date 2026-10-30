@@ -56,7 +56,8 @@ describe('Fiyat, finans, otomasyon (e2e)', () => {
     expect(s.body.totals.orders).toBeGreaterThanOrEqual(1);
     expect(s.body.channels.some((c: { label: string }) => c.label === 'Finans Test')).toBe(true);
     const t = await get('/finance/stock-turnover').expect(200);
-    expect(t.body.some((x: { sku: string; sold: number }) => x.sku === 'DEMO-TS-S' && x.sold >= 2)).toBe(true);
+    expect(t.body.some((x: { sku: string }) => x.sku === 'DEMO-TS-S')).toBe(false); // demo ürünler raporlara girmez
+    expect(Array.isArray(t.body)).toBe(true);
     const x = await get('/finance/export').expect(200);
     expect(x.headers['content-disposition']).toContain('rapor-');
   });
