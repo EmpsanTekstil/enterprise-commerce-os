@@ -94,4 +94,7 @@ infra/     Dockerfile'lar
 - [x] Faz 6 devam — Paketleme akışı (toplama/faturalama/takip no → kanala bildirim), webhook alıcısı (anahtar doğrulamalı), Stok ve Depolar ekranı (bakiyeler, kritik stok, elle düzeltme, hareket geçmişi, çoklu depo, kanal stok politikası, mutabakat)
 - [x] Faz 5 (kısmi) — n11 adaptörü (ürün/kategori okuma, stok-fiyat, ürün yükleme, sipariş, SOAP soru-cevap) ve idefix adaptörü (ürün okuma, stok-fiyat, sipariş); ikisi de gerçek hesapla PC'de doğrulanacak
 - [x] Faz 8 (sorular) — Müşteri soruları gelen kutusu (kanallardan çekme, ürünle eşleme, yanıt süresi, şablonlar, personel atama, taslak → onay → kanala gönderim), yapay zekâ taslağı (Claude API; yalnızca katalog verisi; maliyet takibi)
-- [ ] Faz 5 devam — Hepsiburada, Amazon TR, Shopify adaptörleri; n11/idefix ürün yayınlama ve iade
+- [x] Faz 8 (yorumlar) — Excel ile yorum içe aktarma (API olmadığı için), puan/AI sınıflandırma, tekrarlayan sorunlar, cevap taslağı, panelden gönderildi işareti
+- [x] Faz 9 (AI stüdyosu) — ürün başlık/açıklama/SEO önerisi (onayla uygula), veri kalitesi kontrolü, kullanım ve maliyet geçmişi
+- [ ] Faz 5 devam — Hepsiburada, Amazon TR, Shopify adaptörleri
+- [ ] Faz 7 — Reklam (Amazon Ads API + Excel içe aktarma), Faz 9 devam — fiyat kuralları, finans raporları, otomasyonlar; Faz 10 — güvenlik, kullanıcı yönetimi ekranı, canlıya alma
