@@ -8,6 +8,7 @@ import { PublishService } from '../listings/publish.service';
 import { OrdersService } from '../orders/orders.service';
 import { ReturnsService } from '../returns/returns.service';
 import { QuestionsService } from '../support/questions.service';
+import { AdsService } from '../ads/ads.service';
 
 export interface SyncJobPayload { variantIds?: string[]; since?: string }
 
@@ -28,6 +29,7 @@ export class SyncService {
     private orders: OrdersService,
     private returns: ReturnsService,
     private questions: QuestionsService,
+    private ads: AdsService,
   ) {}
 
   async run(accountId: string, type: SyncJobType, payload: SyncJobPayload = {}, idempotencyKey?: string) {
@@ -47,6 +49,7 @@ export class SyncService {
         case 'CATEGORY_PULL': result = await this.listings.pullCategories(account, adapter, ctx); break;
         case 'PRODUCT_PULL': result = await this.listings.pullProducts(account, adapter, ctx); break;
         case 'ORDER_PULL': result = await this.orders.pullOrders(account, adapter, ctx, payload.since ? new Date(payload.since) : undefined); break;
+        case 'ADS_PULL': result = await this.ads.pullAds(account, adapter, ctx); break;
         case 'QUESTION_PULL': result = await this.questions.pullQuestions(account, adapter, ctx, payload.since ? new Date(payload.since) : undefined); break;
         case 'RETURN_PULL': result = await this.returns.pullReturns(account, adapter, ctx, payload.since ? new Date(payload.since) : undefined); break;
         case 'BATCH_CHECK': result = await this.publish.checkBatches(account, adapter, ctx); break;

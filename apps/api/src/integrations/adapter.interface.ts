@@ -142,6 +142,9 @@ export interface ExternalReturn {
   raw: unknown;
 }
 
+export interface ExternalCampaign { externalId: string; name: string; type?: string; status: string; dailyBudget?: number; totalBudget?: number; startDate?: Date; endDate?: Date; raw: unknown }
+export interface ExternalAdMetric { campaignExternalId: string; date: Date; productExternalId?: string; impressions: number; clicks: number; spend: number; orders: number; sales: number }
+
 export interface ExternalCategory {
   externalId: string;
   parentExternalId?: string;
@@ -217,6 +220,10 @@ export interface ChannelAdapter {
   approveReturn?(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[]): Promise<PushResult>;
   rejectReturn?(ctx: AdapterContext, returnExternalId: string, claimItemIds: string[], reasonId: string, description: string): Promise<PushResult>;
   fetchReturnRejectReasons?(ctx: AdapterContext): Promise<{ id: string; name: string }[]>;
+
+  fetchCampaigns?(ctx: AdapterContext): Promise<ExternalCampaign[]>;
+  fetchAdMetrics?(ctx: AdapterContext, from: Date, to: Date): Promise<ExternalAdMetric[]>;
+  updateCampaign?(ctx: AdapterContext, campaignExternalId: string, data: { status?: 'ACTIVE' | 'PAUSED'; dailyBudget?: number }): Promise<PushResult>;
 
   fetchQuestions?(ctx: AdapterContext, since: Date, cursor?: string): Promise<PagedResult<ExternalQuestion>>;
   answerQuestion?(ctx: AdapterContext, questionExternalId: string, text: string): Promise<PushResult>;

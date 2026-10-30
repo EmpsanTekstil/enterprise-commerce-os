@@ -778,6 +778,7 @@ model AdvertisingCampaign {
   startDate        DateTime?
   endDate          DateTime?
   isManagedViaApi  Boolean        @default(false) // API yazma yetkisi var mı?
+  source           String         @default("IMPORT")  // API | IMPORT (Excel)
   rawSnapshot      Json?
   lastSyncedAt     DateTime?
   createdAt        DateTime       @default(now())

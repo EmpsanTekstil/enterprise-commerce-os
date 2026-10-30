@@ -1,5 +1,5 @@
 import {
-  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalCategory, ExternalOrder, ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult,
+  AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalAdMetric, ExternalCampaign, ExternalCategory, ExternalOrder, ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult,
 } from '../adapter.interface';
 
 /**
@@ -22,6 +22,7 @@ export class MockAdapter implements ChannelAdapter {
   static shipmentUpdates: { id: string; data: unknown }[] = [];
   static questions: ExternalQuestion[] = [];
   static answers: { id: string; text: string }[] = [];
+  static campaignUpdates: { id: string; data: unknown }[] = [];
   static returnActions: { id: string; action: string; items: string[] }[] = [];
 
   readonly capabilities: CapabilityMatrix = {
@@ -63,6 +64,15 @@ export class MockAdapter implements ChannelAdapter {
   parseWebhook(payload: unknown): ExternalOrder[] { const b = payload as { orders?: ExternalOrder[] }; return (b.orders ?? []).map((o) => ({ ...o, orderedAt: new Date(o.orderedAt) })); }
   async fetchQuestions(): Promise<PagedResult<ExternalQuestion>> { return { items: MockAdapter.questions, total: MockAdapter.questions.length }; }
   async answerQuestion(_c: AdapterContext, id: string, text: string): Promise<PushResult> { MockAdapter.answers.push({ id, text }); return { ok: true }; }
+  async fetchCampaigns(): Promise<ExternalCampaign[]> { return [{ externalId: 'CMP-1', name: 'Tişört Sponsorlu', type: 'sponsored_products', status: 'ACTIVE', dailyBudget: 200, raw: {} }, { externalId: 'CMP-2', name: 'Zayıf Kampanya', type: 'sponsored_products', status: 'ACTIVE', dailyBudget: 100, raw: {} }]; }
+  async fetchAdMetrics(_c: AdapterContext, from: Date): Promise<ExternalAdMetric[]> {
+    const d = new Date(from); d.setHours(0, 0, 0, 0);
+    return [
+      { campaignExternalId: 'CMP-1', date: d, productExternalId: '8690000000011', impressions: 5000, clicks: 150, spend: 180, orders: 9, sales: 2511 },
+      { campaignExternalId: 'CMP-2', date: d, impressions: 3000, clicks: 90, spend: 95, orders: 0, sales: 0 },
+    ];
+  }
+  async updateCampaign(_c: AdapterContext, id: string, data: unknown): Promise<PushResult> { MockAdapter.campaignUpdates.push({ id, data }); return { ok: true }; }
   async fetchReturns(): Promise<PagedResult<ExternalReturn>> { return { items: MockAdapter.returns, total: MockAdapter.returns.length }; }
   async approveReturn(_c: AdapterContext, id: string, items: string[]): Promise<PushResult> { MockAdapter.returnActions.push({ id, action: 'approve', items }); return { ok: true }; }
   async rejectReturn(_c: AdapterContext, id: string, items: string[]): Promise<PushResult> { MockAdapter.returnActions.push({ id, action: 'reject', items }); return { ok: true }; }

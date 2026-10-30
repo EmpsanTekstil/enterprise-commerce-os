@@ -27,6 +27,7 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { FinanceModule } from './modules/finance/finance.module';
 import { AutomationModule } from './modules/automation/automation.module';
 import { UsersModule } from './modules/users/users.module';
+import { AdsModule } from './modules/ads/ads.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { UsersModule } from './modules/users/users.module';
     FinanceModule,
     AutomationModule,
     UsersModule,
+    AdsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
