@@ -54,16 +54,16 @@ export class QuestionsService {
       status: q.status === 'PENDING' ? { in: ['OPEN', 'DRAFTED'] } : (q.status as QuestionStatus | undefined),
       ...(q.q ? { OR: [{ text: { contains: q.q, mode: 'insensitive' } }, { customerName: { contains: q.q, mode: 'insensitive' } }, { product: { name: { contains: q.q, mode: 'insensitive' } } }] } : {}),
     };
-    const [items, total, counts] = await this.prisma.$transaction([
+    const [items, total] = await this.prisma.$transaction([
       this.prisma.customerQuestion.findMany({ where, include: { product: { select: { id: true, name: true } }, channelAccount: { select: { id: true, label: true, channel: { select: { code: true, name: true } } } }, assignedTo: { select: { id: true, fullName: true } }, responses: { orderBy: { createdAt: 'desc' }, include: { author: { select: { fullName: true } } } } }, orderBy: [{ status: 'asc' }, { askedAt: 'desc' }], skip: (q.page - 1) * q.pageSize, take: q.pageSize }),
       this.prisma.customerQuestion.count({ where }),
-      this.prisma.customerQuestion.groupBy({ by: ['status'], where: { organizationId: user.organizationId }, _count: { _all: true } }),
     ]);
+    const countRows = await this.prisma.$queryRaw<{ status: string; count: bigint }[]>`SELECT status::text AS status, COUNT(*)::bigint AS count FROM "CustomerQuestion" WHERE "organizationId" = ${user.organizationId} GROUP BY status`;
     const now = Date.now();
     return {
       items: items.map((i) => ({ ...i, overdue: ['OPEN', 'DRAFTED'].includes(i.status) && !!i.dueAt && i.dueAt.getTime() < now })),
       total, page: q.page, pageSize: q.pageSize, pageCount: Math.ceil(total / q.pageSize),
-      counts: Object.fromEntries(counts.map((c) => [c.status, c._count._all])),
+      counts: Object.fromEntries(countRows.map((c) => [c.status, Number(c.count)])),
     };
   }
 
