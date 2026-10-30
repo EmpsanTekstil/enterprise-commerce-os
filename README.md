@@ -72,6 +72,7 @@ Panelde **Entegrasyonlar → Trendyol → Hesap ekle**: Satıcı ID, API Key, AP
 ## Sorun giderme
 - **`CREDENTIALS_ENCRYPTION_KEY 64 karakterlik hex olmalı`** → `.env` içindeki değer tam 64 karakter 0-9a-f olmalı.
 - **`ECONNREFUSED 5432`** → Docker çalışmıyor; `docker compose ps` ile kontrol et.
+- **`Can't reach database server at localhost:5432`** (Docker çalışırken) → Node 18+ `localhost`ı önce IPv6 (::1) çözer; `.env` içinde `127.0.0.1` kullan ve Docker yeniden başladıysa `docker compose restart postgres redis`.
 - **Giriş yapamıyorum** → Seed çıktısındaki e-postayı kullan; şifre `ADMIN_PASSWORD` ile verdiğin değer.
 - Hata metnini olduğu gibi kopyalayıp Claude'a yapıştır.
 
