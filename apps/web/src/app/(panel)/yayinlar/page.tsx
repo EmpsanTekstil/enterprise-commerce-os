@@ -14,7 +14,7 @@ const STATUS: Record<string, { l: string; t: 'ok' | 'warn' | 'bad' | 'neutral' |
   ACTIVE: { l: 'Yayında', t: 'ok' }, PENDING: { l: 'Onay bekliyor', t: 'info' }, PAUSED: { l: 'Durduruldu', t: 'neutral' }, REJECTED: { l: 'Reddedildi', t: 'bad' },
   ERROR: { l: 'Hata', t: 'bad' }, DRAFT: { l: 'Taslak', t: 'warn' }, UNLINKED: { l: 'Eşleşmedi', t: 'warn' },
 };
-const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme', BATCH_CHECK: 'Onay sonucu sorgulama', RETURN_PULL: 'İade çekme' };
+const JOB: Record<string, string> = { CATEGORY_PULL: 'Kategori çekme', PRODUCT_PULL: 'Ürün içe aktarma', ORDER_PULL: 'Sipariş çekme', STOCK_PUSH: 'Stok gönderme', PRICE_PUSH: 'Fiyat gönderme', BATCH_CHECK: 'Onay sonucu sorgulama', RETURN_PULL: 'İade çekme', QUESTION_PULL: 'Soru çekme' };
 
 export default function ListingsPage() {
   const qc = useQueryClient();

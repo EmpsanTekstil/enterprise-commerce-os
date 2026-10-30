@@ -93,4 +93,5 @@ infra/     Dockerfile'lar
 - [x] Faz 6 (iade) — Kanaldan iade talepleri, onay/ret (API destekliyorsa), fiziksel kontrol sonrası idempotent stoğa alma, Kargo ve İadeler ekranı
 - [x] Faz 6 devam — Paketleme akışı (toplama/faturalama/takip no → kanala bildirim), webhook alıcısı (anahtar doğrulamalı), Stok ve Depolar ekranı (bakiyeler, kritik stok, elle düzeltme, hareket geçmişi, çoklu depo, kanal stok politikası, mutabakat)
 - [x] Faz 5 (kısmi) — n11 adaptörü (ürün/kategori okuma, stok-fiyat, ürün yükleme, sipariş, SOAP soru-cevap) ve idefix adaptörü (ürün okuma, stok-fiyat, sipariş); ikisi de gerçek hesapla PC'de doğrulanacak
+- [x] Faz 8 (sorular) — Müşteri soruları gelen kutusu (kanallardan çekme, ürünle eşleme, yanıt süresi, şablonlar, personel atama, taslak → onay → kanala gönderim), yapay zekâ taslağı (Claude API; yalnızca katalog verisi; maliyet takibi)
 - [ ] Faz 5 devam — Hepsiburada, Amazon TR, Shopify adaptörleri; n11/idefix ürün yayınlama ve iade

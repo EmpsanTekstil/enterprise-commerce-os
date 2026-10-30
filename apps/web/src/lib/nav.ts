@@ -19,7 +19,7 @@ export const NAV: NavItem[] = [
   { href: '/reklam', label: 'Reklam Merkezi', icon: Megaphone, group: 'Reklam' },
   { href: '/reklam/kampanyalar', label: 'Reklam Kampanyaları', icon: Target, group: 'Reklam' },
   { href: '/reklam/analitik', label: 'Reklam Analitiği', icon: BarChart3, group: 'Reklam' },
-  { href: '/sorular', label: 'Müşteri Soruları', icon: MessageCircleQuestion, group: 'Müşteri' },
+  { href: '/sorular', label: 'Müşteri Soruları', icon: MessageCircleQuestion, ready: true, group: 'Müşteri' },
   { href: '/yorumlar', label: 'Ürün Yorumları', icon: Star, group: 'Müşteri' },
   { href: '/gelen-kutusu', label: 'Birleşik Gelen Kutusu', icon: Inbox, group: 'Müşteri' },
   { href: '/yapay-zeka', label: 'Yapay Zekâ Stüdyosu', icon: Sparkles, group: 'Analiz' },
