@@ -4,7 +4,7 @@ Türkiye pazaryerleri (Trendyol, Hepsiburada, Amazon TR, n11, idefix…) ve kend
 
 Belgeler: [PRD](docs/01-PRD.md) · [Mimari](docs/02-MIMARI.md) · [ER Diyagramı](docs/03-ER-DIYAGRAMI.md) · [Kanal API Yetenek Matrisi](docs/04-KANAL-API-YETENEK-MATRISI.md) · [Canlıya Alma](docs/05-CANLIYA-ALMA.md)
 
-**Durum:** 22 menü ekranının tamamı çalışır; 86 otomatik test (18 birim + 68 uçtan uca) her push'ta gerçek PostgreSQL üzerinde koşar. Kanal adaptörleri: Trendyol (tam), n11, idefix, Shopify, Amazon TR (okuma/stok-fiyat/sipariş); Hepsiburada sırada.
+**Durum:** 22 menü ekranının tamamı çalışır; 97 otomatik test (22 birim + 68 API uçtan uca + 7 tarayıcı/Playwright) her push'ta gerçek PostgreSQL ve gerçek tarayıcıda koşar; Docker imajları CI'da derlenir. Kanal adaptörleri: Trendyol (tam), n11, idefix, Shopify, Amazon TR (okuma/stok-fiyat/sipariş); Hepsiburada sırada.
 
 ---
 
@@ -64,6 +64,8 @@ Panelde **Entegrasyonlar → Trendyol → Hesap ekle**: Satıcı ID, API Key, AP
 | `npm run db:seed` | Yetkiler, roller, kanal kataloğu, yönetici |
 | `npm run db:studio` | Veritabanı görsel editörü (Prisma Studio) |
 | `npm test -w @eco/api` | Birim testleri |
+| `npm run test:e2e -w @eco/api` | API uçtan uca testleri (veritabanı gerekir) |
+| `npm run test:ui -w @eco/web` | Tarayıcı testleri (API ve web çalışırken) |
 | `npm run typecheck` | Tip kontrolü |
 | `docker compose --profile app up -d --build` | Üretim: api + web + altyapı tek komutla |
 
@@ -106,4 +108,5 @@ infra/     Dockerfile'lar
 - [x] Faz 10 devam — Üretim Dockerfile'ları (sağlık kontrolü), Caddy ile otomatik HTTPS, yedekleme/geri yükleme betikleri, canlıya alma rehberi; CI'da Docker imajları derleniyor
 - [x] Faz 5 devam — Shopify adaptörü (GraphQL: ürün/varyant, stok, fiyat, sipariş) ve Amazon TR adaptörü (LWA, sipariş, stok/fiyat; geliştirici onayı gerekir)
 - [ ] Faz 5 son — Hepsiburada adaptörü (portal PC'den incelenecek), Amazon rapor tabanlı ürün çekme + Ads API, n11/idefix yayınlama ve iade
-- [ ] Faz 10 son — Playwright arayüz testleri, KVKK veri saklama ayarları, oran sınırlama ince ayarı
+- [x] Faz 10 — Playwright arayüz testleri (giriş, ürün oluşturma, entegrasyon ekleme/bağlantı testi, tüm menü), oran sınırı ortamdan ayarlanabilir
+- [ ] Faz 10 son — KVKK veri saklama ayarları (müşteri verisi maskeleme/silme süresi)
