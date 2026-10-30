@@ -21,6 +21,8 @@ import { BulkModule } from './modules/bulk/bulk.module';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
+import { AiModule } from './modules/ai/ai.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { InventoryModule } from './modules/inventory/inventory.module';
     ReturnsModule,
     WebhooksModule,
     InventoryModule,
+    AiModule,
+    SupportModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

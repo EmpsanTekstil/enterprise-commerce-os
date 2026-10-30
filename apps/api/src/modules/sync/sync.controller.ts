@@ -7,7 +7,7 @@ import { ChannelsService } from '../channels/channels.service';
 import { SyncQueue } from './sync.queue';
 import { SyncService } from './sync.service';
 
-const TYPES = ['CATEGORY_PULL', 'PRODUCT_PULL', 'ORDER_PULL', 'STOCK_PUSH', 'PRICE_PUSH', 'BATCH_CHECK', 'RETURN_PULL'] as const;
+const TYPES = ['CATEGORY_PULL', 'PRODUCT_PULL', 'ORDER_PULL', 'STOCK_PUSH', 'PRICE_PUSH', 'BATCH_CHECK', 'RETURN_PULL', 'QUESTION_PULL'] as const;
 
 class RunSyncDto {
   @IsEnum(TYPES) type: (typeof TYPES)[number];
