@@ -29,8 +29,8 @@ export default function LoginPage() {
           <div className="text-lg font-semibold">Enterprise Commerce OS</div>
           <div className="text-sm text-slate-500">Yönetim paneline giriş yapın</div>
         </div>
-        <div><label className="label">E-posta</label><input className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" /></div>
-        <div><label className="label">Şifre</label><input className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></div>
+        <div><label className="label" htmlFor="email">E-posta</label><input id="email" name="email" className="input" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" /></div>
+        <div><label className="label" htmlFor="password">Şifre</label><input id="password" name="password" className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></div>
         {error && <div className="rounded-lg bg-rose-50 p-2 text-sm text-rose-700 dark:bg-rose-950 dark:text-rose-300">{error}</div>}
         <button className="btn-primary w-full" disabled={loading}>{loading ? 'Giriş yapılıyor…' : 'Giriş Yap'}</button>
       </form>

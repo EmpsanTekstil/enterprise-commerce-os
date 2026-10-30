@@ -91,7 +91,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          { printf '### Arayüz adımı logları\n```\n'; tail -c 2500 /tmp/ui.log 2>/dev/null || true; printf '\n--- api.log ---\n'; tail -c 1200 /tmp/api.log 2>/dev/null || true; printf '\n--- web.log ---\n'; tail -c 800 /tmp/web.log 2>/dev/null || true; printf '\n```\n'; } > /tmp/uilog.md
+          { printf '### Arayüz adımı logları\n```\n'; tail -c 1500 /tmp/ui.log 2>/dev/null || true; printf '\n--- ilk hata bağlamı ---\n'; head -c 1500 "$(ls apps/web/test-results/*/error-context.md 2>/dev/null | head -1)" 2>/dev/null || true; printf '\n--- api.log ---\n'; tail -c 1200 /tmp/api.log 2>/dev/null || true; printf '\n--- web.log ---\n'; tail -c 800 /tmp/web.log 2>/dev/null || true; printf '\n```\n'; } > /tmp/uilog.md
           gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/uilog.md)" >/dev/null || true
       - name: Arayüz test özeti
         if: always()

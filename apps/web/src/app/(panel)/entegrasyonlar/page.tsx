@@ -106,9 +106,9 @@ export default function IntegrationsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setAdding(null)}>
           <form className="card w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); create.mutate(); }}>
             <div className="font-medium">{channels.data?.find((c) => c.code === adding)?.name} hesabı ekle</div>
-            <div><label className="label">Hesap etiketi</label><input className="input" required value={label} onChange={(e) => setLabel(e.target.value)} /></div>
+            <div><label className="label" htmlFor="acc-label">Hesap etiketi</label><input id="acc-label" className="input" required value={label} onChange={(e) => setLabel(e.target.value)} /></div>
             {(CREDENTIAL_FIELDS[adding] ?? []).map((f) => (
-              <div key={f.key}><label className="label">{f.label}</label><input className="input" type={f.secret ? 'password' : 'text'} required autoComplete="off" value={creds[f.key] ?? ''} onChange={(e) => setCreds({ ...creds, [f.key]: e.target.value })} /></div>
+              <div key={f.key}><label className="label" htmlFor={`cred-${f.key}`}>{f.label}</label><input id={`cred-${f.key}`} className="input" type={f.secret ? 'password' : 'text'} required autoComplete="off" value={creds[f.key] ?? ''} onChange={(e) => setCreds({ ...creds, [f.key]: e.target.value })} /></div>
             ))}
             <div className="text-xs text-slate-500">Anahtarlar sunucuda şifrelenerek saklanır; tarayıcıda tutulmaz.</div>
             {create.error && <ErrorBox message={(create.error as Error).message} />}

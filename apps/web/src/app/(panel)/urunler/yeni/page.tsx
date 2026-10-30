@@ -41,8 +41,8 @@ export default function NewProductPage() {
       <section className="card space-y-3">
         <div className="font-medium">Temel bilgiler</div>
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="md:col-span-2"><label className="label">Ürün adı *</label><input className="input" required value={f.name} onChange={set('name')} /></div>
-          <div><label className="label">Marka</label><input className="input" value={f.brand} onChange={set('brand')} /></div>
+          <div className="md:col-span-2"><label className="label" htmlFor="f-name">Ürün adı *</label><input id="f-name" className="input" required value={f.name} onChange={set('name')} /></div>
+          <div><label className="label" htmlFor="f-brand">Marka</label><input id="f-brand" className="input" value={f.brand} onChange={set('brand')} /></div>
           <div><label className="label">Model</label><input className="input" value={f.model} onChange={set('model')} /></div>
           <div className="md:col-span-2"><label className="label">Kategori</label><CategoryPicker value={categoryId} onChange={setCategoryId} /></div>
           <div className="md:col-span-2"><label className="label">Kısa açıklama</label><input className="input" maxLength={500} value={f.shortDescription} onChange={set('shortDescription')} /></div>
@@ -71,7 +71,7 @@ export default function NewProductPage() {
         {variants.map((v, i) => (
           <div key={i} className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
             <div className="grid gap-2 md:grid-cols-4">
-              <div><label className="label">SKU *</label><input className="input" required value={v.sku} onChange={setV(i, 'sku')} /></div>
+              <div><label className="label" htmlFor={`v-sku-${i}`}>SKU *</label><input id={`v-sku-${i}`} className="input" required value={v.sku} onChange={setV(i, 'sku')} /></div>
               <div><label className="label">Barkod</label><input className="input" value={v.barcode} onChange={setV(i, 'barcode')} /></div>
               <div><label className="label">Renk</label><input className="input" value={v.color} onChange={setV(i, 'color')} /></div>
               <div><label className="label">Beden</label><input className="input" value={v.size} onChange={setV(i, 'size')} /></div>
@@ -79,8 +79,8 @@ export default function NewProductPage() {
               <div><label className="label">Ağırlık (gram)</label><input className="input" type="number" min={0} value={v.weightGrams} onChange={setV(i, 'weightGrams')} /></div>
               <div><label className="label">Malzeme</label><input className="input" value={v.material} onChange={setV(i, 'material')} /></div>
               <div><label className="label">Alış maliyeti (₺)</label><input className="input" type="number" min={0} step="0.01" value={v.costPrice} onChange={setV(i, 'costPrice')} /></div>
-              <div><label className="label">Satış fiyatı (₺)</label><input className="input" type="number" min={0} step="0.01" value={v.listPrice} onChange={setV(i, 'listPrice')} /></div>
-              <div><label className="label">Açılış stoğu</label><input className="input" type="number" min={0} value={v.initialStock} onChange={setV(i, 'initialStock')} /></div>
+              <div><label className="label" htmlFor={`v-price-${i}`}>Satış fiyatı (₺)</label><input id={`v-price-${i}`} className="input" type="number" min={0} step="0.01" value={v.listPrice} onChange={setV(i, 'listPrice')} /></div>
+              <div><label className="label" htmlFor={`v-stock-${i}`}>Açılış stoğu</label><input id={`v-stock-${i}`} className="input" type="number" min={0} value={v.initialStock} onChange={setV(i, 'initialStock')} /></div>
             </div>
             {variants.length > 1 && <button type="button" className="btn-danger mt-2" onClick={() => setVariants(variants.filter((_, j) => j !== i))}>Varyantı sil</button>}
           </div>

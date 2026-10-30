@@ -6,6 +6,7 @@ const t = Date.now();
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/giris');
+  await expect(page.getByRole('button', { name: 'Giriş Yap' })).toBeVisible();
   await page.getByLabel('E-posta').fill(email);
   await page.getByLabel('Şifre').fill(password);
   await page.getByRole('button', { name: 'Giriş Yap' }).click();
