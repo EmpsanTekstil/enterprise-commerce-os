@@ -27,6 +27,6 @@ export const NAV: NavItem[] = [
   { href: '/raporlar', label: 'Raporlar', icon: FileBarChart, ready: true, group: 'Analiz' },
   { href: '/otomasyonlar', label: 'Otomasyonlar', icon: Workflow, ready: true, group: 'Sistem' },
   { href: '/entegrasyonlar', label: 'Entegrasyonlar', icon: Plug, ready: true, group: 'Sistem' },
-  { href: '/kullanicilar', label: 'Kullanıcılar ve Yetkiler', icon: Users, group: 'Sistem' },
-  { href: '/ayarlar', label: 'Sistem Ayarları', icon: Settings, group: 'Sistem' },
+  { href: '/kullanicilar', label: 'Kullanıcılar ve Yetkiler', icon: Users, ready: true, group: 'Sistem' },
+  { href: '/ayarlar', label: 'Sistem Ayarları', icon: Settings, ready: true, group: 'Sistem' },
 ];

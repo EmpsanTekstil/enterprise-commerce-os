@@ -98,4 +98,5 @@ infra/     Dockerfile'lar
 - [x] Faz 9 (AI stüdyosu) — ürün başlık/açıklama/SEO önerisi (onayla uygula), veri kalitesi kontrolü, kullanım ve maliyet geçmişi
 - [ ] Faz 5 devam — Hepsiburada, Amazon TR, Shopify adaptörleri
 - [x] Faz 9 devam — Fiyat kuralları ve kârlılık (komisyon/kargo/paketleme/diğer, hedef marj, güvenli alt/üst limit), onaylı fiyat önerileri (onaylanınca kanala gider), Finans ve Raporlar (günlük ciro, kanal karşılaştırma, ürün kârlılığı, iptal/iade oranı, stok devir, Excel), Otomasyonlar (10 tetikleyici, 5 dk'da bir), bildirim merkezi
-- [ ] Faz 7 — Reklam (Amazon Ads API + Excel içe aktarma); Faz 10 — kullanıcı/yetki yönetimi ekranı, ayarlar, güvenlik sertleştirme, canlıya alma; Faz 5 — Hepsiburada, Amazon, Shopify adaptörleri
+- [x] Faz 10 (kısmi) — Kullanıcılar ve Yetkiler (kullanıcı ekleme, geçici şifre, rol atama, rol yetkileri, son yönetici koruması), Sistem Ayarları (şifre değiştirme, sistem durumu, canlıya alma kontrol listesi, denetim kaydı)
+- [ ] Faz 7 — Reklam (Amazon Ads API + Excel içe aktarma); Faz 10 devam — üretim Docker kurulumu doğrulaması, yedekleme betiği; Faz 5 — Hepsiburada, Amazon, Shopify adaptörleri
