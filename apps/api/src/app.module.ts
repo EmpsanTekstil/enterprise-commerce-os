@@ -32,8 +32,8 @@ import { AdsModule } from './modules/ads/ads.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // Rate limiting: dakikada 300 istek / IP
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 300 }]),
+    // Rate limiting: dakikada 300 istek / IP (RATE_LIMIT_PER_MINUTE ile ayarlanır)
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: Number(process.env.RATE_LIMIT_PER_MINUTE ?? 300) }]),
     PrismaModule,
     AuditModule,
     AuthModule,

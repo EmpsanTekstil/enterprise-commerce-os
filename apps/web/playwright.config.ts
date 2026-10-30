@@ -6,6 +6,7 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
+  workers: 1,
   use: { baseURL: process.env.WEB_URL ?? 'http://localhost:3000', locale: 'tr-TR', actionTimeout: 10_000, navigationTimeout: 20_000, screenshot: 'only-on-failure', trace: 'retain-on-failure' },
   reporter: process.env.CI ? [['list'], ['json', { outputFile: '/tmp/ui.json' }]] : 'list',
 });
