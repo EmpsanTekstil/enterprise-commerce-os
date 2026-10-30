@@ -24,7 +24,8 @@ export class QuestionsService {
       pages++;
       for (const q of page.items) {
         const productId = await this.resolveProduct(account, q.productExternalId);
-        const channelAnswered = /answer/i.test(q.status);
+        const st = (q.status ?? '').toUpperCase().replace(/[\s_-]/g, '');
+        const channelAnswered = st === 'ANSWERED' || st === 'CLOSED';
         const ex = await this.prisma.customerQuestion.findUnique({ where: { channelAccountId_externalId: { channelAccountId: account.id, externalId: q.externalId } } });
         const data = { productId, customerName: q.customerName, text: q.text, askedAt: q.askedAt, canReplyViaApi: canReply, rawSnapshot: q.raw as Prisma.InputJsonValue };
         if (ex) {
