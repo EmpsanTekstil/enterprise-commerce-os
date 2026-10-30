@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import sharp from 'sharp';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { MockAdapter } from '../src/integrations/mock/mock.adapter';
 
 describe('Ürün yayınlama (e2e)', () => {
@@ -17,7 +18,7 @@ describe('Ürün yayınlama (e2e)', () => {
     process.env.STORAGE_MODE = 'local'; process.env.LOCAL_STORAGE_DIR = '/tmp/eco-test-storage';
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api/v1');
+    app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
     token = (await post('/auth/login', { email: process.env.ADMIN_EMAIL ?? 'admin@example.com', password: process.env.ADMIN_PASSWORD ?? 'Admin123!' })).body.accessToken;

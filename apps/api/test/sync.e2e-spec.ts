@@ -8,6 +8,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 import { MockAdapter } from '../src/integrations/mock/mock.adapter';
 
 describe('Senkronizasyon (e2e)', () => {
@@ -21,7 +22,7 @@ describe('Senkronizasyon (e2e)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api/v1');
+    app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
     const r = await request(app.getHttpServer()).post('/api/v1/auth/login').send({ email, password }).expect(201);

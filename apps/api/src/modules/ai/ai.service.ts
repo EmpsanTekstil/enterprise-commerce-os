@@ -22,7 +22,10 @@ export class AiService {
   get enabled() { return !!process.env.ANTHROPIC_API_KEY; }
 
   async complete(user: JwtPayload | null, organizationId: string, feature: string, system: string, userPrompt: string, maxTokens = 800): Promise<AiResult> {
-    if (!this.enabled) throw new ServiceUnavailableException('Yapay zekâ yapılandırılmadı: .env içinde ANTHROPIC_API_KEY tanımlayın.');
+    if (!this.enabled) {
+      await this.prisma.aIRequest.create({ data: { organizationId, userId: user?.sub, feature, model: this.model, inputSummary: userPrompt.slice(0, 500), status: 'FAILED', error: 'ANTHROPIC_API_KEY tanımlı değil' } });
+      throw new ServiceUnavailableException('Yapay zekâ yapılandırılmadı: .env içinde ANTHROPIC_API_KEY tanımlayın.');
+    }
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const started = Date.now();

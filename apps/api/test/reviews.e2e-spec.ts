@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { AllExceptionsFilter } from '../src/common/http-exception.filter';
 
 describe('Yorumlar ve AI stüdyosu (e2e)', () => {
   let app: INestApplication; let token: string; let accountId: string;
@@ -14,7 +15,7 @@ describe('Yorumlar ve AI stüdyosu (e2e)', () => {
   beforeAll(async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const m = await Test.createTestingModule({ imports: [AppModule] }).compile();
-    app = m.createNestApplication(); app.setGlobalPrefix('api/v1');
+    app = m.createNestApplication(); app.setGlobalPrefix('api/v1'); app.useGlobalFilters(new AllExceptionsFilter());
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     await app.init();
     token = (await post('/auth/login', { email: process.env.ADMIN_EMAIL ?? 'admin@example.com', password: process.env.ADMIN_PASSWORD ?? 'Admin123!' })).body.accessToken;

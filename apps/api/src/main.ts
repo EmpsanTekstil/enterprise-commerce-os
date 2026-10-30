@@ -5,6 +5,7 @@ import { join } from 'path';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
@@ -15,6 +16,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
   // Yerel depolama modunda görseller /media altından sunulur (S3 modunda kullanılmaz)
   app.useStaticAssets(process.env.LOCAL_STORAGE_DIR ?? join(process.cwd(), 'storage'), { prefix: '/media/' });
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
   );
