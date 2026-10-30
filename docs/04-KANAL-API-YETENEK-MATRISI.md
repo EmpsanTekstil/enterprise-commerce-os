@@ -46,7 +46,7 @@ Durum anahtarı: ✅ resmî dokümanla doğrulandı · 🟡 var ama koşullu (on
 
 **Yapılacak:** Yarın PC'de developers.hepsiburada.com açılıp Listing/OMS/MPOP bölümleri bu tabloya işlenecek (10 dk).
 
-## 3. Amazon Türkiye — 🟡 doğrulanmış ama onay gerektirir
+## 3. Amazon Türkiye — 🟡 doğrulanmış ama onay gerektirir (adaptör yazıldı: LWA, pazar doğrulama, sipariş, stok/fiyat patch, SKU bazlı ürün okuma; rapor akışı planlı)
 
 **Portal:** https://developer-docs.amazon.com/sp-api · **Bölge:** EU (`sellingpartnerapi-eu.amazon.com`) · **Pazar ID (TR):** `A33AVAJ2PDY3EV` · **Kimlik:** Login with Amazon (OAuth 2.0, refresh token) — geliştirici profili kaydı ve rol onayı gerekir. Sandbox mevcut.
 
@@ -105,7 +105,7 @@ Not: Amazon bilgileri resmî dokümandan bilinen, kararlı özelliklerdir; adapt
 | Kategori / özellik | ✅ | Kategoriler, kategori özellik listesi, markalar |
 | Webhook | ❌ | Dokümanda yok |
 
-## 6. Shopify — ✅ (bilinen, kararlı)
+## 6. Shopify — ✅ (adaptör yazıldı: GraphQL 2026-01; ürün/varyant okuma, inventorySetQuantities, productVariantsBulkUpdate, sipariş)
 
 **Portal:** https://shopify.dev · **Kimlik:** Custom app Admin API access token · GraphQL Admin API. Ürün/varyant/stok/fiyat/sipariş/kargo/iade tam destek; webhook var; "müşteri sorusu" ve "pazaryeri reklamı" kavramı yok (❌, kanal türü STOREFRONT). Adaptör yazılırken sürüm doğrulanacak.
 

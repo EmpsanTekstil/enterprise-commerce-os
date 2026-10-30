@@ -4,7 +4,7 @@ Türkiye pazaryerleri (Trendyol, Hepsiburada, Amazon TR, n11, idefix…) ve kend
 
 Belgeler: [PRD](docs/01-PRD.md) · [Mimari](docs/02-MIMARI.md) · [ER Diyagramı](docs/03-ER-DIYAGRAMI.md) · [Kanal API Yetenek Matrisi](docs/04-KANAL-API-YETENEK-MATRISI.md) · [Canlıya Alma](docs/05-CANLIYA-ALMA.md)
 
-**Durum:** 22 menü ekranının tamamı çalışır; 86 otomatik test (18 birim + 68 uçtan uca) her push'ta gerçek PostgreSQL üzerinde koşar. Kanal adaptörleri: Trendyol (tam), n11, idefix (okuma/stok-fiyat/sipariş); Hepsiburada, Amazon, Shopify sırada.
+**Durum:** 22 menü ekranının tamamı çalışır; 86 otomatik test (18 birim + 68 uçtan uca) her push'ta gerçek PostgreSQL üzerinde koşar. Kanal adaptörleri: Trendyol (tam), n11, idefix, Shopify, Amazon TR (okuma/stok-fiyat/sipariş); Hepsiburada sırada.
 
 ---
 
@@ -104,5 +104,6 @@ infra/     Dockerfile'lar
 - [x] Faz 7 — Reklam Merkezi (API destekleyen kanaldan çekme, diğerleri için Excel içe aktarma; harcama/satış/ROAS/ACOS/CTR/CPC; ürün ve kanal kırılımı), Kampanyalar (API destekliyse durdur/başlat/bütçe — onaylı), Analitik (kural tabanlı bulgular + AI yorumu)
 - [x] Birleşik Gelen Kutusu — bekleyen sorular, cevapsız olumsuz yorumlar, iade talepleri, okunmamış bildirimler tek akışta
 - [x] Faz 10 devam — Üretim Dockerfile'ları (sağlık kontrolü), Caddy ile otomatik HTTPS, yedekleme/geri yükleme betikleri, canlıya alma rehberi; CI'da Docker imajları derleniyor
-- [ ] Faz 5 — Hepsiburada, Amazon (SP-API + Ads API), Shopify adaptörleri; n11/idefix yayınlama ve iade
+- [x] Faz 5 devam — Shopify adaptörü (GraphQL: ürün/varyant, stok, fiyat, sipariş) ve Amazon TR adaptörü (LWA, sipariş, stok/fiyat; geliştirici onayı gerekir)
+- [ ] Faz 5 son — Hepsiburada adaptörü (portal PC'den incelenecek), Amazon rapor tabanlı ürün çekme + Ads API, n11/idefix yayınlama ve iade
 - [ ] Faz 10 son — Playwright arayüz testleri, KVKK veri saklama ayarları, oran sınırlama ince ayarı

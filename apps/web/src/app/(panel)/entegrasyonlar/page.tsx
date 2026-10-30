@@ -14,7 +14,7 @@ const CREDENTIAL_FIELDS: Record<string, { key: string; label: string; secret?: b
   amazon_tr: [{ key: 'sellerId', label: 'Seller ID' }, { key: 'clientId', label: 'LWA Client ID' }, { key: 'clientSecret', label: 'LWA Client Secret', secret: true }, { key: 'refreshToken', label: 'Refresh Token', secret: true }],
   n11: [{ key: 'appKey', label: 'App Key' }, { key: 'appSecret', label: 'App Secret', secret: true }, { key: 'integrator', label: 'Entegratör adı (isteğe bağlı)' }],
   idefix: [{ key: 'vendorId', label: 'Vendor ID (Satıcı ID)' }, { key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],
-  shopify: [{ key: 'shopDomain', label: 'Mağaza alan adı (ornek.myshopify.com)' }, { key: 'accessToken', label: 'Admin API Access Token', secret: true }],
+  shopify: [{ key: 'shopDomain', label: 'Mağaza alan adı (ornek.myshopify.com)' }, { key: 'accessToken', label: 'Admin API Access Token (Custom app)', secret: true }],
 };
 
 const CAP_LABEL: Record<string, string> = {

@@ -5,6 +5,8 @@ import { PlaceholderAdapter } from './placeholder.adapter';
 import { MockAdapter } from './mock/mock.adapter';
 import { N11Adapter } from './n11/n11.adapter';
 import { IdefixAdapter } from './idefix/idefix.adapter';
+import { ShopifyAdapter } from './shopify/shopify.adapter';
+import { AmazonAdapter } from './amazon/amazon.adapter';
 
 /**
  * Kanal adaptörlerinin tek kayıt noktası.
@@ -19,10 +21,10 @@ export class AdapterRegistry {
       new TrendyolAdapter(),
       // Aşağıdakiler yetenek matrisi doğrulandıkça gerçek adaptörlerle değiştirilecek.
       new PlaceholderAdapter('hepsiburada', 'Hepsiburada'),
-      new PlaceholderAdapter('amazon_tr', 'Amazon Türkiye'),
+      new AmazonAdapter(),
       new N11Adapter(),
       new IdefixAdapter(),
-      new PlaceholderAdapter('shopify', 'Shopify'),
+      new ShopifyAdapter(),
     ];
     if (process.env.ENABLE_MOCK_CHANNEL === '1' || process.env.NODE_ENV === 'test') list.push(new MockAdapter());
     for (const a of list) this.adapters.set(a.code, a);
