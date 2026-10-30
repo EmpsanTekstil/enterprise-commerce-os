@@ -7,7 +7,7 @@ import { api, fmtTRY } from '@/lib/api';
 
 interface Account { id: string; label: string; status: string; channel: { code: string; name: string } }
 interface Suggestion { variantId: string; confidence: string; reason: string; variant: { sku: string; barcode: string | null; product: { name: string } } | null }
-interface Listing { id: string; externalId: string; externalSku: string | null; title: string | null; price: string | null; stockQuantity: number | null; status: string; lastError: string | null; lastSyncedAt: string | null; variantId: string | null; variant: { sku: string; product: { id: string; name: string } } | null; matchSuggestions: Suggestion[]; channelAccount: { label: string; channel: { name: string } } }
+interface Listing { id: string; externalId: string; externalSku: string | null; title: string | null; description: string | null; price: string | null; salePrice: string | null; stockQuantity: number | null; status: string; lastError: string | null; lastSyncedAt: string | null; variantId: string | null; variant: { sku: string; product: { id: string; name: string } } | null; matchSuggestions: Suggestion[]; channelAccount: { label: string; channel: { name: string } } }
 interface Job { id: string; type: string; status: string; error: string | null; result: Record<string, unknown> | null; createdAt: string; channelAccount: { label: string } }
 
 const STATUS: Record<string, { l: string; t: 'ok' | 'warn' | 'bad' | 'neutral' | 'info' }> = {
@@ -33,8 +33,18 @@ export default function ListingsPage() {
   const link = useMutation({ mutationFn: (p: { id: string; variantId: string }) => api(`/listings/${p.id}/link`, { method: 'POST', body: JSON.stringify({ variantId: p.variantId }) }), onSuccess: refresh });
   const createProduct = useMutation({ mutationFn: (id: string) => api(`/listings/${id}/create-product`, { method: 'POST' }), onSuccess: refresh });
   const [editing, setEditing] = useState<Listing | null>(null);
-  const [form, setForm] = useState({ title: '', price: '', salePrice: '' });
-  const saveListing = useMutation({ mutationFn: () => api(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title || undefined, price: form.price ? Number(form.price) : undefined, salePrice: form.salePrice ? Number(form.salePrice) : undefined }) }), onSuccess: () => { setEditing(null); refresh(); } });
+  const [form, setForm] = useState({ title: '', description: '', price: '', salePrice: '' });
+  const [notice, setNotice] = useState('');
+  type Push = { ok: boolean; error?: string; batchRequestId?: string };
+  const saveListing = useMutation({
+    mutationFn: () => api<{ pushed: { price?: Push; content?: Push } }>(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title && form.title !== (editing!.title ?? '') ? form.title : undefined, description: form.description && form.description !== (editing!.description ?? '') ? form.description : undefined, price: form.price ? Number(form.price) : undefined, salePrice: form.salePrice ? Number(form.salePrice) : undefined }) }),
+    onSuccess: (r) => {
+      const ch = editing!.channelAccount.channel.name; const m: string[] = [];
+      if (r.pushed?.price) m.push(r.pushed.price.ok ? `Fiyat ${ch}'a gönderildi (dakikalar içinde yansır)` : `Fiyat gönderilemedi: ${r.pushed.price.error}`);
+      if (r.pushed?.content) m.push(r.pushed.content.ok ? `Başlık/açıklama ${ch}'a gönderildi (onaydan sonra yayınlanır)` : `Başlık/açıklama gönderilemedi: ${r.pushed.content.error}`);
+      setNotice(m.join(' · ') || 'Yerelde kaydedildi (ilan kanalda yayında değil)'); setEditing(null); refresh();
+    },
+  });
   const acceptAll = useMutation({ mutationFn: () => api<{ linked: number; skipped: number }>('/listings/accept-suggestions', { method: 'POST', body: JSON.stringify({ accountId }) }), onSuccess: refresh });
   const importAll = useMutation({ mutationFn: () => api<{ listings: number; products: number; variants: number; linkedExisting: number; skipped: number }>('/listings/import-catalog', { method: 'POST', body: JSON.stringify({ accountId }) }), onSuccess: refresh });
 
@@ -103,7 +113,7 @@ export default function ListingsPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge>{l.variant && <button className="mt-1 block text-xs text-brand-600 underline" onClick={() => { setEditing(l); setForm({ title: l.title ?? '', price: l.price ?? '', salePrice: '' }); }}>Düzenle</button>}</td>
+                  <td className="px-3 py-2"><Badge tone={STATUS[l.status]?.t ?? 'neutral'}>{STATUS[l.status]?.l ?? l.status}</Badge>{l.variant && <button className="mt-1 block text-xs text-brand-600 underline" onClick={() => { setEditing(l); setForm({ title: l.title ?? '', description: l.description ?? '', price: l.price ?? '', salePrice: l.salePrice ?? '' }); }}>Düzenle</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -111,13 +121,15 @@ export default function ListingsPage() {
         </div>
       )}
 
+      {notice && <div className="card text-sm flex justify-between"><span>{notice}</span><button className="btn-secondary" onClick={() => setNotice('')}>Kapat</button></div>}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditing(null)}>
           <form className="card w-full max-w-md space-y-3" onClick={(e) => e.stopPropagation()} onSubmit={(e) => { e.preventDefault(); saveListing.mutate(); }}>
             <div className="font-medium">Kanal-özel ilan bilgisi · {editing.channelAccount.channel.name}</div>
             <div><label className="label">Başlık (en fazla 100)</label><input className="input" maxLength={100} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+            <div><label className="label">Açıklama</label><textarea className="input min-h-24" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
             <div className="grid grid-cols-2 gap-2"><div><label className="label">Liste fiyatı</label><input className="input" type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></div><div><label className="label">İndirimli fiyat</label><input className="input" type="number" step="0.01" value={form.salePrice} onChange={(e) => setForm({ ...form, salePrice: e.target.value })} /></div></div>
-            <div className="text-xs text-slate-500">Boş bırakılan alanlar merkezi üründen alınır. Değişiklik kanala "Stok/fiyat gönder" veya yeniden yayınlama ile gider.</div>
+            <div className="text-xs text-slate-500">Kaydedince değişiklik kanala anında gönderilir: fiyat dakikalar içinde, başlık/açıklama kanal onayından sonra yayınlanır. Stok merkezi stoktan "Stok/fiyat gönder" ile gider.</div>
             {saveListing.error && <ErrorBox message={(saveListing.error as Error).message} />}
             <div className="flex gap-2"><button className="btn-primary" disabled={saveListing.isPending}>Kaydet</button><button type="button" className="btn-secondary" onClick={() => setEditing(null)}>Vazgeç</button></div>
           </form>

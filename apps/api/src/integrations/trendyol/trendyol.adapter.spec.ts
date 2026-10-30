@@ -17,5 +17,8 @@ describe('Trendyol adaptörü (ağ gerektirmeyen)', () => {
     expect(items[0]).toMatchObject({ externalId: 'NTBDFYNE0578', barcode: 'NTBDFYNE0578', sku: undefined, title: content.title, brand: 'DFYNE', brandExternalId: '2826877', groupId: 'NTBDFYNE023', categoryExternalId: '525', vatRate: 10, originCountryCode: 'TR', price: 1499, salePrice: 1399, stock: 30, images: ['https://cdn/1.jpg'], status: 'active', attributes: { Renk: 'Kahverengi', Beden: 'XL' } });
     expect(items[1]).toMatchObject({ externalId: 'NTBDFYNE0579', sku: 'SKU-L', status: 'paused', attributes: { Renk: 'Kahverengi', Beden: 'L' } });
     expect((items[0].raw as { commission: number }).commission).toBe(21.5);
+    // Güncelleme (PUT v2) için gereken kimlikler saklanır
+    expect(items[0].channelAttributes).toEqual([{ attributeId: '47', customValue: 'Kahverengi' }, { attributeId: '338', customValue: 'XL' }]);
+    expect(items[0].raw).toMatchObject({ brandId: 2826877, categoryId: 525, productMainId: 'NTBDFYNE023', description: '<p>Açıklama</p>' });
   });
 });

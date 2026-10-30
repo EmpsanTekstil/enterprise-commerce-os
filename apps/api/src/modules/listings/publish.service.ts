@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { ChannelAccount, Prisma } from '@prisma/client';
-import { AdapterContext, ChannelAdapter, ChannelAttributeDef, ExternalProduct, UnsupportedOperationError } from '../../integrations/adapter.interface';
+import { AdapterContext, ChannelAdapter, ChannelAttributeDef, ExternalProduct, PushResult, UnsupportedOperationError } from '../../integrations/adapter.interface';
 import { AdapterRegistry } from '../../integrations/adapter.registry';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -211,12 +211,57 @@ export class PublishService {
   }
 
   // ---------------- ilan düzenleme ----------------
+  /**
+   * Kanal-özel ilan düzenlemesi. Yerelde kaydeder ve ilan kanalda yayındaysa değişikliği ANINDA kanala gönderir:
+   * fiyat → updateStockAndPrice (Trendyol'da dakikalar içinde), başlık/açıklama → updateProducts (Trendyol onayından sonra yayınlanır).
+   */
   async updateListing(user: JwtPayload, listingId: string, data: { title?: string; description?: string; price?: number; salePrice?: number; imageOrder?: string[] }) {
-    const l = await this.prisma.listing.findFirst({ where: { id: listingId, channelAccount: { organizationId: user.organizationId } } });
+    const l = await this.prisma.listing.findFirst({ where: { id: listingId, channelAccount: { organizationId: user.organizationId } }, include: { channelAccount: { include: { channel: true } }, variant: true } });
     if (!l) throw new NotFoundException('İlan bulunamadı');
     if (data.title && data.title.length > 100) throw new BadRequestException('Başlık en fazla 100 karakter');
+    const price = data.price ?? (l.price != null ? Number(l.price) : undefined);
+    const salePrice = data.salePrice ?? (data.price != null ? data.price : l.salePrice != null ? Number(l.salePrice) : undefined);
+    if (price != null && salePrice != null && salePrice > price) throw new BadRequestException('İndirimli fiyat liste fiyatından büyük olamaz');
+    const live = !!l.externalId && l.status !== 'DRAFT';
+    const adapter = this.registry.get(l.channelAccount.channel.code);
+    const raw = (l.rawSnapshot ?? {}) as Record<string, unknown>;
+    const contentChanged = data.title != null || data.description != null || data.imageOrder != null;
     const updated = await this.prisma.listing.update({ where: { id: listingId }, data: { ...data, imageOrder: data.imageOrder as Prisma.InputJsonValue | undefined } });
     await this.audit.log(user, 'listing.update', 'Listing', listingId, { title: l.title, price: l.price }, data);
-    return updated;
+    const pushed: { price?: PushResult; content?: PushResult } = {};
+    if (!live) return { ...updated, pushed };
+
+    const ctx = this.channels.buildContext(l.channelAccount);
+    const barcode = l.variant?.barcode ?? l.externalId!;
+    if ((data.price != null || data.salePrice != null) && price != null) {
+      pushed.price = adapter.updateStockAndPrice
+        ? (await adapter.updateStockAndPrice(ctx, [{ barcode, price, salePrice: salePrice ?? price }]))[0]
+        : { ok: false, error: `${adapter.displayName} fiyat güncellemeyi API ile desteklemiyor` };
+    }
+    if (contentChanged) {
+      if (!adapter.updateProducts) pushed.content = { ok: false, error: `${adapter.displayName} başlık/açıklama güncellemeyi API ile desteklemiyor; yeniden yayınlayın` };
+      else {
+        const attrs = (raw.channelAttributes ?? []) as { attributeId?: number; attributeValueId?: number; attributeValue?: string }[];
+        const product: ExternalProduct = {
+          externalId: l.externalId!, barcode, sku: updated.externalSku ?? (raw.stockCode as string | undefined) ?? undefined,
+          title: updated.title ?? '', description: updated.description ?? (raw.description as string | undefined),
+          groupId: raw.productMainId as string | undefined, brandExternalId: raw.brandId != null ? String(raw.brandId) : undefined, categoryExternalId: raw.categoryId != null ? String(raw.categoryId) : undefined,
+          vatRate: raw.vatRate as number | undefined, originCountryCode: raw.origin as string | undefined,
+          weightGrams: raw.dimensionalWeight ? Number(raw.dimensionalWeight) * 1000 : undefined,
+          images: raw.images as string[] | undefined,
+          channelAttributes: attrs.filter((a) => a.attributeId).map((a) => ({ attributeId: String(a.attributeId), ...(a.attributeValueId ? { valueId: String(a.attributeValueId) } : { customValue: a.attributeValue ?? '' }) })),
+          raw,
+        };
+        pushed.content = (await adapter.updateProducts(ctx, [product]))[0];
+      }
+    }
+    const errors = [pushed.price, pushed.content].filter((r) => r && !r.ok).map((r) => r!.error).join('; ');
+    const batchRequestId = pushed.content?.batchRequestId ?? pushed.price?.batchRequestId;
+    const after = await this.prisma.listing.update({
+      where: { id: listingId },
+      data: { lastError: errors || null, ...(batchRequestId ? { batchRequestId } : {}), ...(pushed.content?.ok ? { status: 'PENDING' } : {}) },
+    });
+    await this.audit.log(user, 'listing.push', 'Listing', listingId, null, pushed as unknown as Prisma.InputJsonValue);
+    return { ...after, pushed };
   }
 }

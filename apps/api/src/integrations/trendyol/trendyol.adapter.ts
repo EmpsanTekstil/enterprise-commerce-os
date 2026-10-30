@@ -1,6 +1,6 @@
 import {
   AdapterContext, BatchStatus, CapabilityMatrix, ChannelAdapter, ChannelAttributeDef, ExternalBrand, ExternalCategory, ExternalOrder,
-  ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult, UnsupportedOperationError,
+  ExternalProduct, ExternalQuestion, ExternalReturn, PagedResult, PushResult,
 } from '../adapter.interface';
 import { HttpError, httpRequest } from '../http-client';
 
@@ -30,7 +30,7 @@ interface TyVariant {
 interface TyContent {
   contentId?: number; productMainId?: string; title: string; description?: string;
   brand?: { id?: number; name?: string }; category?: { id?: number; name?: string };
-  images?: { url: string }[]; attributes?: TyAttr[]; variants?: TyVariant[];
+  dimensionalWeight?: number; images?: { url: string }[]; attributes?: TyAttr[]; variants?: TyVariant[];
 }
 
 export class TrendyolAdapter implements ChannelAdapter {
@@ -132,19 +132,17 @@ export class TrendyolAdapter implements ChannelAdapter {
   }
 
   /** Product Create v2 — asenkron; sonuç checkBatch ile sorgulanır. */
-  async createProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
-    const items = products.map((p) => ({
+  /** Create/Update v2 ortak ürün gövdesi (fiyat/stok alanları yalnızca create'te). */
+  private static toItem(p: ExternalProduct) {
+    return {
       barcode: p.barcode ?? p.externalId,
       title: (p.title ?? '').slice(0, 100),
       productMainId: (p.groupId ?? p.barcode ?? p.externalId).slice(0, 40),
       brandId: Number(p.brandExternalId),
       categoryId: Number(p.categoryExternalId),
-      quantity: p.stock ?? 0,
       stockCode: p.sku?.slice(0, 100),
       dimensionalWeight: p.weightGrams ? Math.max(1, Math.ceil(p.weightGrams / 1000)) : 1,
       description: (p.description ?? p.title ?? '').slice(0, 30000),
-      listPrice: p.price ?? p.salePrice ?? 0,
-      salePrice: p.salePrice ?? p.price ?? 0,
       vatRate: Math.round(p.vatRate ?? 20),
       ...(p.originCountryCode ? { origin: p.originCountryCode } : {}),
       images: (p.images ?? []).slice(0, 8).map((url) => ({ url })),
@@ -153,7 +151,11 @@ export class TrendyolAdapter implements ChannelAdapter {
         ...(a.valueId ? { attributeValueId: Number(a.valueId) } : {}),
         ...(a.customValue ? { customAttributeValue: a.customValue } : {}),
       })),
-    }));
+    };
+  }
+
+  async createProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    const items = products.map((p) => ({ ...TrendyolAdapter.toItem(p), quantity: p.stock ?? 0, listPrice: p.price ?? p.salePrice ?? 0, salePrice: p.salePrice ?? p.price ?? 0 }));
     try {
       const r = await httpRequest<{ batchRequestId: string }>({ method: 'POST', url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/v2/products`, headers: this.headers(ctx), body: { items } });
       return items.map((i) => ({ ok: true, externalId: i.barcode, batchRequestId: r.batchRequestId }));
@@ -211,8 +213,10 @@ export class TrendyolAdapter implements ChannelAdapter {
       stock: v.stock?.quantity,
       images,
       attributes: { ...base, ...Object.fromEntries((v.attributes ?? []).filter((a) => a.attributeName).map((a) => [a.attributeName!, a.attributeValue ?? ''])) },
+      channelAttributes: [...(c.attributes ?? []), ...(v.attributes ?? [])].filter((a) => a.attributeId).map((a) => ({ attributeId: String(a.attributeId), ...(a.attributeValueId ? { valueId: String(a.attributeValueId) } : { customValue: a.attributeValue ?? '' }) })),
+      weightGrams: c.dimensionalWeight ? c.dimensionalWeight * 1000 : undefined,
       status: v.archived ? 'archived' : v.onSale ? 'active' : 'paused',
-      raw: { contentId: c.contentId, productMainId: c.productMainId, brand: c.brand?.name, categoryName: c.category?.name, images, vatRate: v.vatRate, origin: v.origin, productUrl: v.productUrl, variantId: v.variantId, commission: v.commission, locked: v.locked, hasViolation: v.hasViolation, blacklisted: v.blacklisted },
+      raw: { contentId: c.contentId, productMainId: c.productMainId, brand: c.brand?.name, brandId: c.brand?.id, categoryId: c.category?.id, stockCode: v.stockCode, dimensionalWeight: c.dimensionalWeight, description: c.description, channelAttributes: [...(c.attributes ?? []), ...(v.attributes ?? [])], categoryName: c.category?.name, images, vatRate: v.vatRate, origin: v.origin, productUrl: v.productUrl, variantId: v.variantId, commission: v.commission, locked: v.locked, hasViolation: v.hasViolation, blacklisted: v.blacklisted },
     }));
   }
 
@@ -368,6 +372,23 @@ export class TrendyolAdapter implements ChannelAdapter {
     }
   }
 
-  // Henüz kodlanmayanlar: sahte başarı yerine açık hata.
-  async updateProducts(): Promise<PushResult[]> { throw new UnsupportedOperationError(this.displayName, 'products.update'); }
+  /**
+   * Onaylı ürün içeriği güncelleme (content-bulk-update): başlık/açıklama/görsel, contentId ile; kısmi güncelleme desteklenir,
+   * özellikler gönderilmez (hepsini göndermek gerekir). Fiyat/stok updateStockAndPrice ile gider. Asenkron, batchRequestId döner.
+   * https://developers.trendyol.com/v2.0/docs/product-update-approved-product-v2
+   */
+  async updateProducts(ctx: AdapterContext, products: ExternalProduct[]): Promise<PushResult[]> {
+    const items = products.map((p) => {
+      const contentId = (p.raw as { contentId?: number } | undefined)?.contentId;
+      return { barcode: p.barcode ?? p.externalId, contentId, ...(p.title ? { title: p.title.slice(0, 100) } : {}), ...(p.description ? { description: p.description.slice(0, 30000) } : {}), ...(p.images?.length ? { images: p.images.slice(0, 8).map((url) => ({ url })) } : {}) };
+    });
+    const missing = items.filter((i) => !i.contentId);
+    if (missing.length) return items.map((i) => ({ ok: false, externalId: i.barcode, error: 'Trendyol contentId yok; "Ürünleri içe aktar" ile ilanı yeniden çekin' }));
+    try {
+      const r = await httpRequest<{ batchRequestId: string }>({ method: 'POST', url: `${this.baseUrl}/product/sellers/${this.sellerId(ctx)}/products/content-bulk-update`, headers: this.headers(ctx), body: { items: items.map(({ barcode: _b, ...rest }) => rest) } });
+      return items.map((i) => ({ ok: true, externalId: i.barcode, batchRequestId: r.batchRequestId }));
+    } catch (e) {
+      return items.map((i) => ({ ok: false, externalId: i.barcode, error: (e as Error).message }));
+    }
+  }
 }
