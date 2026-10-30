@@ -97,4 +97,5 @@ infra/     Dockerfile'lar
 - [x] Faz 8 (yorumlar) — Excel ile yorum içe aktarma (API olmadığı için), puan/AI sınıflandırma, tekrarlayan sorunlar, cevap taslağı, panelden gönderildi işareti
 - [x] Faz 9 (AI stüdyosu) — ürün başlık/açıklama/SEO önerisi (onayla uygula), veri kalitesi kontrolü, kullanım ve maliyet geçmişi
 - [ ] Faz 5 devam — Hepsiburada, Amazon TR, Shopify adaptörleri
-- [ ] Faz 7 — Reklam (Amazon Ads API + Excel içe aktarma), Faz 9 devam — fiyat kuralları, finans raporları, otomasyonlar; Faz 10 — güvenlik, kullanıcı yönetimi ekranı, canlıya alma
+- [x] Faz 9 devam — Fiyat kuralları ve kârlılık (komisyon/kargo/paketleme/diğer, hedef marj, güvenli alt/üst limit), onaylı fiyat önerileri (onaylanınca kanala gider), Finans ve Raporlar (günlük ciro, kanal karşılaştırma, ürün kârlılığı, iptal/iade oranı, stok devir, Excel), Otomasyonlar (10 tetikleyici, 5 dk'da bir), bildirim merkezi
+- [ ] Faz 7 — Reklam (Amazon Ads API + Excel içe aktarma); Faz 10 — kullanıcı/yetki yönetimi ekranı, ayarlar, güvenlik sertleştirme, canlıya alma; Faz 5 — Hepsiburada, Amazon, Shopify adaptörleri
