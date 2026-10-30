@@ -60,9 +60,10 @@ export class AdsService {
     }
     const day = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     const where = { campaignId: c.id, variantId, date: day };
+    const data = { impressions: m.impressions ?? 0, clicks: m.clicks ?? 0, spend: m.spend ?? 0, orders: m.orders ?? 0, sales: m.sales ?? 0 };
     const ex = await this.prisma.advertisingMetric.findFirst({ where });
-    if (ex) await this.prisma.advertisingMetric.update({ where: { id: ex.id }, data: m });
-    else await this.prisma.advertisingMetric.create({ data: { ...where, ...m } });
+    if (ex) await this.prisma.advertisingMetric.update({ where: { id: ex.id }, data });
+    else await this.prisma.advertisingMetric.create({ data: { ...where, ...data } });
     return 1;
   }
 
