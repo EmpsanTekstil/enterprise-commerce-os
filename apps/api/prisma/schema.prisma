@@ -27,6 +27,10 @@ model Organization {
   name      String
   slug      String   @unique
   isDemo    Boolean  @default(false) // Demo verisi gerçek veriden ayrılır
+  // KVKK veri saklama: null = kapalı. piiMaskAfterDays: sipariş/iade/soru/yorumlarda müşteri kimlik bilgisi maskelenir; rawPurgeAfterDays: kanaldan gelen ham veri silinir.
+  piiMaskAfterDays   Int?
+  rawPurgeAfterDays  Int?
+  piiLastRunAt       DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -584,6 +588,7 @@ model Order {
   estimatedProfit  Decimal?    @db.Decimal(14, 2)
   orderedAt        DateTime
   rawSnapshot      Json?
+  piiMaskedAt      DateTime?   // KVKK: müşteri bilgileri maskelendi
   isDemo           Boolean     @default(false)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

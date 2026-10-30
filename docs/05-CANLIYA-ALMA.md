@@ -58,3 +58,4 @@ Migration'lar API başlarken otomatik uygulanır.
 - Yönetici hesabı dışında personele en dar rol; ilk girişte şifre değiştirme.
 - `CREDENTIALS_ENCRYPTION_KEY` ve veritabanı yedekleri ayrı yerlerde.
 - Trendyol webhook: Entegrasyonlar → Webhook anahtarı → Partner panelinde `https://panel.firmam.com/api/v1/webhooks/trendyol/<hesapId>` + API_KEY.
+- KVKK: Sistem Ayarları → KVKK veri saklama sekmesinde müşteri bilgisi maskeleme (örn. 730 gün) ve kanal ham verisi silme (örn. 365 gün) sürelerini belirleyin; iş günde bir otomatik çalışır, sonuçlar denetim kaydına yazılır. Süre dolan kayıtlarda ad/e-posta/telefon/adres geri alınamaz şekilde maskelenir; tutarlar ve raporlar korunur.
