@@ -1,0 +1,4 @@
+export interface AdKpi { impressions: number; clicks: number; spend: number; orders: number; sales: number; ctr: number; cpc: number; roas: number; acos: number | null; conversion: number }
+export interface AdCampaignRow extends AdKpi { campaign: { id: string; name: string; status: string; dailyBudget: number | null; isManagedViaApi: boolean; source: string; channel: string; accountId: string } }
+export interface AdDashboard { total: AdKpi; activeCampaigns: number; totalCampaigns: number; campaigns: AdCampaignRow[]; series: { day: string; spend: number; sales: number; orders: number }[]; products: (AdKpi & { variantId: string; sku: string; name: string })[]; channels: (AdKpi & { accountId: string; label: string; channel: string })[] }
+export const pct = (n: number | null | undefined, d = 1) => (n == null ? '—' : `%${n.toFixed(d)}`);
