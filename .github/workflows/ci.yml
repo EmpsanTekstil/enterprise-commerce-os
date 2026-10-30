@@ -81,7 +81,8 @@ jobs:
           WEB_URL: http://localhost:3000
         run: |
           npx playwright install --with-deps chromium
-          ls apps/api/dist | head; (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
+          test -f apps/api/dist/main.js || (echo 'dist/main.js yok'; ls -R apps/api/dist | head -20; exit 1)
+          (cd apps/api && node dist/main.js > /tmp/api.log 2>&1 &)
           (cd apps/web && cp -r .next/static .next/standalone/apps/web/.next/ && cp -r public .next/standalone/apps/web/ 2>/dev/null; cd .next/standalone && PORT=3000 HOSTNAME=0.0.0.0 node apps/web/server.js > /tmp/web.log 2>&1 &)
           for i in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health >/dev/null && curl -sf http://localhost:3000/giris >/dev/null && break; sleep 2; done
           curl -sf http://localhost:4000/api/v1/health || (cat /tmp/api.log; exit 1)
