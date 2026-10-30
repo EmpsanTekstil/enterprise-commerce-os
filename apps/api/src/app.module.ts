@@ -23,6 +23,9 @@ import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { AiModule } from './modules/ai/ai.module';
 import { SupportModule } from './modules/support/support.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { FinanceModule } from './modules/finance/finance.module';
+import { AutomationModule } from './modules/automation/automation.module';
 
 @Module({
   imports: [
@@ -48,6 +51,9 @@ import { SupportModule } from './modules/support/support.module';
     InventoryModule,
     AiModule,
     SupportModule,
+    PricingModule,
+    FinanceModule,
+    AutomationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

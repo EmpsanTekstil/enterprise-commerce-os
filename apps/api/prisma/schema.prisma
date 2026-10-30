@@ -724,6 +724,35 @@ model PricingRule {
   @@index([organizationId])
 }
 
+enum ProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+  FAILED
+}
+
+/// Otomatik fiyat önerisi; yalnızca kullanıcı onayıyla uygulanır.
+model PriceProposal {
+  id               String         @id @default(uuid())
+  organizationId   String
+  channelAccountId String
+  listingId        String
+  ruleId           String?
+  currentPrice     Decimal?       @db.Decimal(14, 2)
+  proposedPrice    Decimal        @db.Decimal(14, 2)
+  reason           String
+  breakdownJson    Json?
+  status           ProposalStatus @default(PENDING)
+  decidedById      String?
+  decidedAt        DateTime?
+  error            String?
+  createdAt        DateTime       @default(now())
+
+  @@index([organizationId, status, createdAt])
+  @@index([listingId])
+}
+
 // ------------------------------------------------------------
 // REKLAM
 // ------------------------------------------------------------

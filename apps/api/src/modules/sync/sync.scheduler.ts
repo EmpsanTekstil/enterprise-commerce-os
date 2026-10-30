@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SyncQueue } from './sync.queue';
+import { AutomationService } from '../automation/automation.service';
 
 /**
  * Periyodik senkron: bağlı tüm hesaplar için siparişleri her 5 dakikada bir çeker.
@@ -11,7 +12,7 @@ export class SyncScheduler implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(SyncScheduler.name);
   private timer?: NodeJS.Timeout;
 
-  constructor(private prisma: PrismaService, private queue: SyncQueue) {}
+  constructor(private prisma: PrismaService, private queue: SyncQueue, private automation: AutomationService) {}
 
   onModuleInit() {
     if (process.env.SYNC_SCHEDULER === 'off' || process.env.NODE_ENV === 'test') return;
@@ -23,6 +24,7 @@ export class SyncScheduler implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
 
   async tick() {
+    await this.automation.evaluateAll().catch((e) => this.log.error(`Otomasyon: ${(e as Error).message}`));
     const accounts = await this.prisma.channelAccount.findMany({ where: { status: 'CONNECTED' } });
     const bucket = Math.floor(Date.now() / 300_000); // 5 dk'lık pencere → aynı pencerede tek iş
     for (const a of accounts) {
