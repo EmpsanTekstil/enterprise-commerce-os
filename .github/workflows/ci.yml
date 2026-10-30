@@ -109,8 +109,10 @@ jobs:
           gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/ui.md)" >/dev/null || true
       - name: Docker imajları derlenebilir mi
         run: |
-          docker build -f infra/api.Dockerfile -t eco-api:ci . 
-          docker build -f infra/web.Dockerfile -t eco-web:ci .
+          docker build -f infra/api.Dockerfile -t eco-api:ci . 2>&1 | tail -40
+          test ${PIPESTATUS[0]} -eq 0
+          docker build -f infra/web.Dockerfile -t eco-web:ci . 2>&1 | tail -40
+          test ${PIPESTATUS[0]} -eq 0
       # Üretilen migration ve lock dosyalarını depoya geri yaz (yalnızca main, yalnızca değişiklik varsa)
       - name: Üretilen dosyaları commit et
         if: github.ref == 'refs/heads/main'
