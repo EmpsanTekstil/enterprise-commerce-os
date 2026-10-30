@@ -84,7 +84,15 @@ jobs:
           (cd apps/web && npx next start -p 3000 > /tmp/web.log 2>&1 &)
           for i in $(seq 1 60); do curl -sf http://localhost:4000/api/v1/health >/dev/null && curl -sf http://localhost:3000/giris >/dev/null && break; sleep 2; done
           curl -sf http://localhost:4000/api/v1/health || (cat /tmp/api.log; exit 1)
-          npm run test:ui -w @eco/web
+          curl -sf http://localhost:3000/giris >/dev/null || (cat /tmp/web.log; exit 1)
+          npm run test:ui -w @eco/web 2>&1 | tee /tmp/ui.log; test ${PIPESTATUS[0]} -eq 0
+      - name: Arayüz logları (hata durumunda)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { printf '### Arayüz adımı logları\n```\n'; tail -c 2500 /tmp/ui.log 2>/dev/null || true; printf '\n--- api.log ---\n'; tail -c 1200 /tmp/api.log 2>/dev/null || true; printf '\n--- web.log ---\n'; tail -c 800 /tmp/web.log 2>/dev/null || true; printf '\n```\n'; } > /tmp/uilog.md
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/uilog.md)" >/dev/null || true
       - name: Arayüz test özeti
         if: always()
         env:
