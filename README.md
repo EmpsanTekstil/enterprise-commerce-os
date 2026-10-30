@@ -4,7 +4,7 @@ Türkiye pazaryerleri (Trendyol, Hepsiburada, Amazon TR, n11, idefix…) ve kend
 
 Belgeler: [PRD](docs/01-PRD.md) · [Mimari](docs/02-MIMARI.md) · [ER Diyagramı](docs/03-ER-DIYAGRAMI.md) · [Kanal API Yetenek Matrisi](docs/04-KANAL-API-YETENEK-MATRISI.md) · [Canlıya Alma](docs/05-CANLIYA-ALMA.md)
 
-**Durum:** 22 menü ekranının tamamı çalışır; 128 otomatik test (50 birim + 71 API uçtan uca + 7 tarayıcı/Playwright) her push'ta gerçek PostgreSQL ve gerçek tarayıcıda koşar; Docker imajları CI'da derlenir. Kanal adaptörleri: Trendyol (tam), Hepsiburada, n11, idefix (okuma, stok-fiyat, sipariş, ürün yayınlama, paketleme/kargo), Shopify, Amazon TR (rapor tabanlı ürün çekme, stok-fiyat, sipariş, kargo onayı, Ads API); Trendyol dışındakiler gerçek hesaplarla doğrulanacak.
+**Durum:** 22 menü ekranının tamamı çalışır; 129 otomatik test (51 birim + 72 API uçtan uca + 7 tarayıcı/Playwright) her push'ta gerçek PostgreSQL ve gerçek tarayıcıda koşar; Docker imajları CI'da derlenir. Kanal adaptörleri: Trendyol (tam), Hepsiburada, n11, idefix (okuma, stok-fiyat, sipariş, ürün yayınlama, paketleme/kargo), Shopify, Amazon TR (rapor tabanlı ürün çekme, stok-fiyat, sipariş, kargo onayı, Ads API); Trendyol dışındakiler gerçek hesaplarla doğrulanacak.
 
 ---
 

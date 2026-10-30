@@ -96,6 +96,18 @@ describe('Senkronizasyon (e2e)', () => {
     expect(l.body.items.every((x: { variantId: string | null }) => x.variantId !== null)).toBe(true);
   });
 
+  it('toplu katalog aktarımı: SKU\'su var olan ilanlar mevcut varyanta bağlanır, yeni ürün açılmaz', async () => {
+    const acc2 = (await request(app.getHttpServer()).post('/api/v1/channels/accounts').set(auth()).send({ channelCode: 'mock', label: 'Toplu Aktarım', credentials: { apiKey: 'test' }, isDemo: true })).body.id;
+    await request(app.getHttpServer()).post(`/api/v1/sync/accounts/${acc2}/run`).set(auth()).send({ type: 'PRODUCT_PULL' }).expect(201);
+    const r = await request(app.getHttpServer()).post('/api/v1/listings/import-catalog').set(auth()).send({ accountId: acc2 }).expect(201);
+    expect(r.body).toMatchObject({ listings: 3, products: 0, variants: 0, linkedExisting: 3, skipped: 0 });
+    const l = await request(app.getHttpServer()).get(`/api/v1/listings?accountId=${acc2}`).set(auth());
+    expect(l.body.items.every((x: { variantId: string | null }) => x.variantId !== null)).toBe(true);
+    const again = await request(app.getHttpServer()).post('/api/v1/listings/import-catalog').set(auth()).send({ accountId: acc2 }).expect(201);
+    expect(again.body.listings).toBe(0);
+    await request(app.getHttpServer()).delete(`/api/v1/channels/accounts/${acc2}`).set(auth());
+  });
+
   it('siparişi çeker ve stoğu bir kez düşer; tekrar çekince çift düşmez', async () => {
     const before = await stockOf('DEMO-TS-S');
     const r1 = await request(app.getHttpServer()).post(`/api/v1/sync/accounts/${accountId}/run`).set(auth()).send({ type: 'ORDER_PULL' }).expect(201);

@@ -212,7 +212,7 @@ export class TrendyolAdapter implements ChannelAdapter {
       images,
       attributes: { ...base, ...Object.fromEntries((v.attributes ?? []).filter((a) => a.attributeName).map((a) => [a.attributeName!, a.attributeValue ?? ''])) },
       status: v.archived ? 'archived' : v.onSale ? 'active' : 'paused',
-      raw: { contentId: c.contentId, productMainId: c.productMainId, productUrl: v.productUrl, variantId: v.variantId, commission: v.commission, locked: v.locked, hasViolation: v.hasViolation, blacklisted: v.blacklisted },
+      raw: { contentId: c.contentId, productMainId: c.productMainId, brand: c.brand?.name, categoryName: c.category?.name, images, vatRate: v.vatRate, origin: v.origin, productUrl: v.productUrl, variantId: v.variantId, commission: v.commission, locked: v.locked, hasViolation: v.hasViolation, blacklisted: v.blacklisted },
     }));
   }
 

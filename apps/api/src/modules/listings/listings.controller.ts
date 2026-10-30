@@ -52,4 +52,8 @@ export class ListingsController {
 
   @Post('accept-suggestions') @RequirePermissions('listings.write')
   accept(@CurrentUser() u: JwtPayload, @Body() dto: AcceptDto) { return this.svc.acceptSuggestions(u, dto.accountId, dto.minConfidence); }
+
+  /** Hesaptaki bağlı olmayan ilanların tamamından merkezi ürün/varyant oluşturur (model bazında gruplar). */
+  @Post('import-catalog') @RequirePermissions('products.write')
+  importCatalog(@CurrentUser() u: JwtPayload, @Body() dto: AcceptDto) { return this.svc.importCatalog(u, dto.accountId); }
 }

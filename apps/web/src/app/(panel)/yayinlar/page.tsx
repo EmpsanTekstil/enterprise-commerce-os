@@ -36,8 +36,9 @@ export default function ListingsPage() {
   const [form, setForm] = useState({ title: '', price: '', salePrice: '' });
   const saveListing = useMutation({ mutationFn: () => api(`/listings/${editing!.id}`, { method: 'PATCH', body: JSON.stringify({ title: form.title || undefined, price: form.price ? Number(form.price) : undefined, salePrice: form.salePrice ? Number(form.salePrice) : undefined }) }), onSuccess: () => { setEditing(null); refresh(); } });
   const acceptAll = useMutation({ mutationFn: () => api<{ linked: number; skipped: number }>('/listings/accept-suggestions', { method: 'POST', body: JSON.stringify({ accountId }) }), onSuccess: refresh });
+  const importAll = useMutation({ mutationFn: () => api<{ listings: number; products: number; variants: number; linkedExisting: number; skipped: number }>('/listings/import-catalog', { method: 'POST', body: JSON.stringify({ accountId }) }), onSuccess: refresh });
 
-  const err = (run.error ?? link.error ?? createProduct.error ?? acceptAll.error ?? listings.error) as Error | null;
+  const err = (run.error ?? link.error ?? createProduct.error ?? acceptAll.error ?? importAll.error ?? listings.error) as Error | null;
   const connected = accounts.data?.filter((a) => a.status === 'CONNECTED') ?? [];
 
   return (
@@ -65,6 +66,8 @@ export default function ListingsPage() {
           <button className="btn-secondary" disabled={run.isPending} onClick={() => run.mutate('BATCH_CHECK')}>Onay sonuçlarını sorgula</button>
           {run.data?.status && <span className={`text-sm ${run.data.status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}`}>{run.data.status === 'SUCCESS' ? 'Tamamlandı' : `Hata: ${run.data.error}`}</span>}
           {acceptAll.data && <span className="text-sm text-slate-500">{acceptAll.data.linked} bağlandı, {acceptAll.data.skipped} çakışma/atlandı</span>}
+          <button className="btn-secondary" disabled={importAll.isPending} onClick={() => { if (confirm('Bu hesaptaki eşleşmemiş tüm ilanlardan merkezi ürün ve varyant oluşturulacak (model koduna göre gruplanır). Devam?')) importAll.mutate(); }}>Eşleşmemişleri kataloğa aktar</button>
+          {importAll.data && <span className="text-sm text-slate-500">{importAll.data.products} ürün, {importAll.data.variants} varyant oluşturuldu; {importAll.data.linkedExisting} mevcut SKU'ya bağlandı</span>}
         </div>
       )}
       {accountId && !connected.some((a) => a.id === accountId) && <div className="card text-sm text-amber-700">Bu hesap bağlı değil. Entegrasyonlar sayfasından "Bağlantıyı test et" ile bağlayın.</div>}

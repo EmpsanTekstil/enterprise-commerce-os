@@ -137,6 +137,65 @@ export class ListingsService {
     return { linked, skipped };
   }
 
+  /**
+   * Hesaptaki bağlı olmayan tüm ilanları merkezi kataloğa toplu aktarır.
+   * Gruplama: rawSnapshot.productMainId (Trendyol model kodu) → tek ürün, her ilan bir varyant (renk/beden attributesJson'dan).
+   * SKU: externalSku, yoksa barkod. SKU'su zaten var olan ilan yeni ürün açmaz, mevcut varyanta bağlanır. Açılış stoğu varsayılan depoya yazılır.
+   */
+  async importCatalog(user: JwtPayload, accountId: string) {
+    const account = await this.prisma.channelAccount.findFirst({ where: { id: accountId, organizationId: user.organizationId } });
+    if (!account) throw new NotFoundException('Kanal hesabı bulunamadı');
+    const listings = await this.prisma.listing.findMany({ where: { channelAccountId: accountId, variantId: null, externalId: { not: null } }, orderBy: { externalId: 'asc' } });
+    const wh = await this.prisma.warehouse.findFirst({ where: { organizationId: user.organizationId, isDefault: true } });
+    const groups = new Map<string, typeof listings>();
+    for (const l of listings) {
+      const raw = (l.rawSnapshot ?? {}) as Record<string, unknown>;
+      const key = typeof raw.productMainId === 'string' && raw.productMainId ? `model:${raw.productMainId}` : `single:${l.id}`;
+      groups.set(key, [...(groups.get(key) ?? []), l]);
+    }
+    const pick = (attrs: Record<string, string>, names: string[]) => { const k = Object.keys(attrs).find((a) => names.includes(a.toLocaleLowerCase('tr'))); return k ? attrs[k] : undefined; };
+    let products = 0, variants = 0, linkedExisting = 0, skipped = 0;
+    for (const [key, group] of groups) {
+      const first = group[0]; const raw = (first.rawSnapshot ?? {}) as Record<string, unknown>;
+      const attrs0 = (first.attributesJson ?? {}) as Record<string, string>;
+      const specs = Object.fromEntries(Object.entries(attrs0).filter(([k]) => !['renk', 'color', 'beden', 'size', 'numara'].includes(k.toLocaleLowerCase('tr'))));
+      let productId: string | null = null;
+      for (const l of group) {
+        const attrs = (l.attributesJson ?? {}) as Record<string, string>;
+        let sku = l.externalSku || l.externalId!;
+        const existing = await this.prisma.productVariant.findFirst({ where: { sku, product: { organizationId: user.organizationId } } });
+        if (existing) {
+          const clash = await this.prisma.listing.findFirst({ where: { channelAccountId: accountId, variantId: existing.id, id: { not: l.id } }, select: { id: true } });
+          if (!clash) { try { await this.link(user, l.id, existing.id); linkedExisting++; } catch { skipped++; } continue; }
+          // Kanal aynı stok kodunu birden çok barkodda kullanıyor (ör. tüm bedenler tek stockCode): SKU'yu barkodla tekilleştir.
+          sku = `${sku}-${l.externalId}`;
+          if (await this.prisma.productVariant.findFirst({ where: { sku, product: { organizationId: user.organizationId } } })) { skipped++; continue; }
+        }
+        if (!productId) {
+          const images = Array.isArray(raw.images) ? (raw.images as unknown[]).filter((u): u is string => typeof u === 'string') : [];
+          const p = await this.prisma.product.create({
+            data: {
+              organizationId: user.organizationId, name: first.title ?? sku, brand: typeof raw.brand === 'string' ? raw.brand : undefined,
+              model: key.startsWith('model:') ? key.slice(6) : undefined, description: first.description, specsJson: specs as Prisma.InputJsonValue,
+              originCountry: typeof raw.origin === 'string' ? raw.origin : undefined, vatRate: typeof raw.vatRate === 'number' ? raw.vatRate : undefined, status: 'ACTIVE',
+              images: { create: images.slice(0, 8).map((url, i) => ({ organizationId: user.organizationId, storageKey: `external:${url}`, url, sortOrder: i })) },
+            },
+          });
+          productId = p.id; products++;
+        }
+        const v = await this.prisma.productVariant.create({ data: { productId, sku, barcode: l.externalId, color: pick(attrs, ['renk', 'color']), size: pick(attrs, ['beden', 'size', 'numara']), listPrice: l.price ?? undefined } });
+        variants++;
+        if (wh) {
+          await this.prisma.inventoryBalance.create({ data: { warehouseId: wh.id, variantId: v.id, onHand: l.stockQuantity ?? 0 } });
+          if (l.stockQuantity) await this.prisma.inventoryMovement.create({ data: { warehouseId: wh.id, variantId: v.id, type: 'ADJUSTMENT', quantity: l.stockQuantity, referenceKey: `import:${l.id}`, note: 'Kanaldan içe aktarılan açılış stoğu', createdById: user.sub } });
+        }
+        await this.link(user, l.id, v.id);
+      }
+    }
+    await this.audit.log(user, 'listing.import_catalog', 'ChannelAccount', accountId, null, { listings: listings.length, products, variants, linkedExisting, skipped });
+    return { listings: listings.length, products, variants, linkedExisting, skipped };
+  }
+
   /** Kanalda olup merkezde olmayan bir ilandan merkezi ürün + varyant oluşturur ve bağlar. */
   async createProductFromListing(user: JwtPayload, listingId: string) {
     const l = await this.getOwned(user, listingId);
