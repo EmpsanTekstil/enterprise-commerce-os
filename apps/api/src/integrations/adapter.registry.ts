@@ -7,6 +7,7 @@ import { N11Adapter } from './n11/n11.adapter';
 import { IdefixAdapter } from './idefix/idefix.adapter';
 import { ShopifyAdapter } from './shopify/shopify.adapter';
 import { AmazonAdapter } from './amazon/amazon.adapter';
+import { HepsiburadaAdapter } from './hepsiburada/hepsiburada.adapter';
 
 /**
  * Kanal adaptörlerinin tek kayıt noktası.
@@ -20,7 +21,7 @@ export class AdapterRegistry {
     const list: ChannelAdapter[] = [
       new TrendyolAdapter(),
       // Aşağıdakiler yetenek matrisi doğrulandıkça gerçek adaptörlerle değiştirilecek.
-      new PlaceholderAdapter('hepsiburada', 'Hepsiburada'),
+      new HepsiburadaAdapter(),
       new AmazonAdapter(),
       new N11Adapter(),
       new IdefixAdapter(),

@@ -10,7 +10,7 @@ interface Account { id: string; label: string; status: string; lastError: string
 /** Kanal başına istenen kimlik alanları. Alan adları adaptörün beklediği anahtarlarla aynıdır. */
 const CREDENTIAL_FIELDS: Record<string, { key: string; label: string; secret?: boolean }[]> = {
   trendyol: [{ key: 'supplierId', label: 'Satıcı ID (Cari ID)' }, { key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],
-  hepsiburada: [{ key: 'merchantId', label: 'Merchant ID' }, { key: 'username', label: 'Kullanıcı adı' }, { key: 'password', label: 'Şifre / Secret', secret: true }],
+  hepsiburada: [{ key: 'merchantId', label: 'Merchant ID' }, { key: 'username', label: 'Entegrasyon kullanıcı adı' }, { key: 'password', label: 'Entegrasyon şifresi', secret: true }],
   amazon_tr: [{ key: 'sellerId', label: 'Seller ID' }, { key: 'clientId', label: 'LWA Client ID' }, { key: 'clientSecret', label: 'LWA Client Secret', secret: true }, { key: 'refreshToken', label: 'Refresh Token', secret: true }],
   n11: [{ key: 'appKey', label: 'App Key' }, { key: 'appSecret', label: 'App Secret', secret: true }, { key: 'integrator', label: 'Entegratör adı (isteğe bağlı)' }],
   idefix: [{ key: 'vendorId', label: 'Vendor ID (Satıcı ID)' }, { key: 'apiKey', label: 'API Key' }, { key: 'apiSecret', label: 'API Secret', secret: true }],

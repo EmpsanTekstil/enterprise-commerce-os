@@ -32,7 +32,7 @@ Durum anahtarı: ✅ resmî dokümanla doğrulandı · 🟡 var ama koşullu (on
 | Kategori / özellik | ✅ | `product-categories`, `categories/{id}/attributes` (V2), özellik değerleri |
 | Webhook | ✅ | Sipariş paketi olayları; satıcı başına 15 webhook; teslimat garantisi yok → periyodik senkron şart — [doküman](https://developers.trendyol.com/docs/webhook-model) |
 
-## 2. Hepsiburada — ❔ portal bu ortamdan okunamadı
+## 2. Hepsiburada — 🟡 ikincil kaynaktan doğrulandı, adaptör yazıldı (PC'de gerçek hesapla teyit edilecek)
 
 **Portal:** https://developers.hepsiburada.com (JavaScript tabanlı; bu oturumda içerik alınamadı). Bilinen API aileleri: **Listing API** (stok/fiyat/ilan), **OMS API** (sipariş/paket/kargo), **MPOP katalog** (ürün oluşturma), ayrı test (SIT) ortamı. Kimlik: Merchant ID + kullanıcı adı/şifre (Basic Auth). Satıcı panelinden API kullanıcısı oluşturulur ve entegrasyon başvurusu onaylanır (ikincil kaynak: [zunapro rehberi](https://www.zunapro.com/turkey/en/blog/hepsiburada-integration-api-guide-seller-manual)).
 
@@ -44,7 +44,8 @@ Durum anahtarı: ✅ resmî dokümanla doğrulandı · 🟡 var ama koşullu (on
 | İade | ❔ | |
 | Soru / yorum / reklam | ❔ | Resmî kanıt bulunamadı |
 
-**Yapılacak:** Yarın PC'de developers.hepsiburada.com açılıp Listing/OMS/MPOP bölümleri bu tabloya işlenecek (10 dk).
+**Uç noktalar (açık kaynak istemciden; üretim alt alan adları `-sit` eki olmadan):** Listing `listing-external.hepsiburada.com/listings/merchantid/{id}` (+ `/inventory-uploads` XML, `/inventory-uploads/id/{id}`), OMS `oms-external.hepsiburada.com/orders|packages/merchantid/{id}`, iade `/claims/merchantid/{id}`, `/claims/number/{no}/accept|reject`, MPOP `mpop.hepsiburada.com/product/api/...`. Kimlik: Basic `username:password` + `User-Agent: {username} - SelfIntegration`.
+**Yapılacak:** Gerçek hesapla bağlantı testi; alan adları farklıysa `rawSnapshot` üzerinden düzeltme.
 
 ## 3. Amazon Türkiye — 🟡 doğrulanmış ama onay gerektirir (adaptör yazıldı: LWA, pazar doğrulama, sipariş, stok/fiyat patch, SKU bazlı ürün okuma; rapor akışı planlı)
 
