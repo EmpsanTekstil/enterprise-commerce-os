@@ -1,0 +1,13 @@
+# Tek alan adı: panel ve API aynı adreste. API /api/* ve /media/* altında.
+{$DOMAIN} {
+	encode gzip
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+	handle /media/* {
+		reverse_proxy api:4000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

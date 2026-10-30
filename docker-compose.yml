@@ -56,6 +56,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-eco}:${POSTGRES_PASSWORD:-eco_dev_password}@postgres:5432/${POSTGRES_DB:-eco}
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://minio:9000
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    volumes:
+      - api_storage:/app/apps/api/storage
     ports:
       - "4000:4000"
     depends_on:
@@ -69,16 +72,33 @@ services:
     build:
       context: .
       dockerfile: infra/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
     restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000
     ports:
       - "3000:3000"
     depends_on:
       - api
     profiles: ["app"]
 
+  # Üretim: HTTPS ters vekil (alan adını .env içinde DOMAIN ile verin)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [api, web]
+    profiles: ["prod"]
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  api_storage:
+  caddy_data:
