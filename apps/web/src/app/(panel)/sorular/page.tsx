@@ -34,7 +34,7 @@ export default function QuestionsPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[['PENDING', 'Cevap bekleyen', (c.OPEN ?? 0) + (c.DRAFTED ?? 0)], ['OPEN', 'Taslaksız', c.OPEN ?? 0], ['DRAFTED', 'Onay bekleyen taslak', c.DRAFTED ?? 0], ['ANSWERED', 'Cevaplanan', c.ANSWERED ?? 0]].map(([k, l, n]) => (
-          <button key={k as string} onClick={() => setStatus(k as string)} className={`card text-left ${status === k ? 'ring-2 ring-brand-500' : ''}`}><div className="text-xs text-slate-500">{l}</div><div className="text-2xl font-semibold">{n as number}</div></button>
+          <button key={k as string} data-testid={`q-count-${k}`} onClick={() => setStatus(k as string)} className={`card text-left ${status === k ? 'ring-2 ring-brand-500' : ''}`}><div className="text-xs text-slate-500">{l}</div><div className="text-2xl font-semibold">{n as number}</div></button>
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2">

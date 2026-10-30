@@ -61,7 +61,7 @@ export default function IntegrationsPage() {
         {accounts.data?.length === 0 && <div className="card text-sm text-slate-500">Henüz hesap eklenmedi. Aşağıdan bir kanal seçip anahtarlarınızı girin.</div>}
         <div className="grid gap-3 md:grid-cols-2">
           {accounts.data?.map((a) => (
-            <div key={a.id} className="card space-y-2">
+            <div key={a.id} className="card space-y-2" data-testid="account-card">
               <div className="flex items-center gap-2"><span className="font-medium">{a.channel.name}</span><span className="text-sm text-slate-500">{a.label}</span><span className="ml-auto"><Badge tone={a.status === 'CONNECTED' ? 'ok' : a.status === 'ERROR' ? 'bad' : 'warn'}>{STATUS_TEXT[a.status] ?? a.status}</Badge></span></div>
               <div className="text-xs text-slate-500">{Object.entries(a.credentialSummary).map(([k, v]) => `${k}: ${v}`).join(' · ')}</div>
               {(testResult[a.id] || a.lastError) && <div className={`text-xs ${testResult[a.id]?.ok ? 'text-emerald-600' : 'text-rose-600'}`}>{testResult[a.id]?.message ?? a.lastError}</div>}
@@ -76,7 +76,7 @@ export default function IntegrationsPage() {
         {channels.error && <ErrorBox message={(channels.error as Error).message} />}
         <div className="grid gap-3 md:grid-cols-3">
           {channels.data?.map((c) => (
-            <div key={c.id} className="card space-y-2">
+            <div key={c.id} className="card space-y-2" data-testid={`channel-${c.code}`}>
               <div className="flex items-center gap-2"><span className="font-medium">{c.name}</span><Badge tone={c.kind === 'MARKETPLACE' ? 'info' : 'neutral'}>{c.kind === 'MARKETPLACE' ? 'Pazaryeri' : 'Mağaza'}</Badge></div>
               <div className="flex gap-2">
                 <button className="btn-primary" onClick={() => { setAdding(c.code); setLabel(`${c.name} - Ana Mağaza`); setCreds({}); }}>Hesap ekle</button>

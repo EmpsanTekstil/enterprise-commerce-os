@@ -60,14 +60,14 @@ test('ürün listesinde arama ve toplu işlemler şablonu', async ({ page }) => 
 test('entegrasyonlar: test kanalı ekle, bağlantıyı test et, yetenekleri gör', async ({ page }) => {
   await login(page);
   await page.goto('/entegrasyonlar');
-  const card = page.locator('.card', { hasText: 'Test Kanalı' }).first();
+  const card = page.getByTestId('channel-mock');
   await card.getByRole('button', { name: 'Yetenekler' }).click();
   await expect(card.getByText('Ürün okuma')).toBeVisible();
   await card.getByRole('button', { name: 'Hesap ekle' }).click();
   await page.getByLabel('Hesap etiketi').fill(`UI Mağaza ${t}`);
   await page.getByLabel('API Key (test için: test)').fill('test');
   await page.getByRole('button', { name: 'Kaydet' }).click();
-  const acc = page.locator('.card', { hasText: `UI Mağaza ${t}` }).first();
+  const acc = page.getByTestId('account-card').filter({ hasText: `UI Mağaza ${t}` }).first();
   await expect(acc).toBeVisible();
   await acc.getByRole('button', { name: 'Bağlantıyı test et' }).click();
   await expect(acc.getByText('Test kanalı bağlı')).toBeVisible();
@@ -87,7 +87,7 @@ test('menünün tamamı "yakında" olmadan açılır', async ({ page }) => {
 test('sorular ekranı sayaçları ve yorumlar uyarısı', async ({ page }) => {
   await login(page);
   await page.goto('/sorular');
-  await expect(page.getByText('Cevap bekleyen')).toBeVisible();
+  await expect(page.getByTestId('q-count-PENDING')).toBeVisible();
   await page.goto('/yorumlar');
   await expect(page.getByText(/yorum okuma\/cevaplama sunmuyor/)).toBeVisible();
 });

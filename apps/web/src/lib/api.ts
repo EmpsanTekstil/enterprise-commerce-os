@@ -22,7 +22,7 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}/api/v1${path}`, { ...init, headers });
-  if (res.status === 401 && typeof window !== 'undefined') {
+  if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/login')) {
     clearSession();
     window.location.href = '/giris';
   }
