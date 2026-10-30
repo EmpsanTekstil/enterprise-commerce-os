@@ -28,6 +28,7 @@ describe('Reklam (e2e)', () => {
 
   it('API ile kampanya ve metrik çeker; KPI hesaplar; ürün bazında kırılım', async () => {
     const r = await post(`/sync/accounts/${accountId}/run`, { type: 'ADS_PULL' }).expect(201);
+    expect(r.body.error ?? null).toBeNull();
     expect(r.body.result).toMatchObject({ campaigns: 2, metrics: 2 });
     await post(`/sync/accounts/${accountId}/run`, { type: 'ADS_PULL' }).expect(201); // tekrar: çift kayıt yok
     const d = await get('/ads/dashboard').expect(200);

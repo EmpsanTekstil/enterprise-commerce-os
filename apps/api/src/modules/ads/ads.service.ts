@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ChannelAccount, Prisma } from '@prisma/client';
+import { CampaignStatus, ChannelAccount, Prisma } from '@prisma/client';
 import { AdapterContext, ChannelAdapter, UnsupportedOperationError } from '../../integrations/adapter.interface';
 import { AdapterRegistry } from '../../integrations/adapter.registry';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -36,10 +36,11 @@ export class AdsService {
     if (!adapter.fetchCampaigns || !adapter.fetchAdMetrics) throw new UnsupportedOperationError(adapter.displayName, 'ads.reports');
     const campaigns = await adapter.fetchCampaigns(ctx);
     for (const c of campaigns) {
+      const status = mapCampaignStatus(c.status);
       await this.prisma.advertisingCampaign.upsert({
         where: { channelAccountId_externalId: { channelAccountId: account.id, externalId: c.externalId } },
-        update: { name: c.name, type: c.type, status: c.status as never, dailyBudget: c.dailyBudget, totalBudget: c.totalBudget, startDate: c.startDate, endDate: c.endDate, isManagedViaApi: !!adapter.updateCampaign, source: 'API', rawSnapshot: c.raw as Prisma.InputJsonValue, lastSyncedAt: new Date() },
-        create: { organizationId: account.organizationId, channelAccountId: account.id, externalId: c.externalId, name: c.name, type: c.type, status: c.status as never, dailyBudget: c.dailyBudget, totalBudget: c.totalBudget, startDate: c.startDate, endDate: c.endDate, isManagedViaApi: !!adapter.updateCampaign, source: 'API', rawSnapshot: c.raw as Prisma.InputJsonValue, lastSyncedAt: new Date() },
+        update: { name: c.name, type: c.type, status, dailyBudget: c.dailyBudget, totalBudget: c.totalBudget, startDate: c.startDate, endDate: c.endDate, isManagedViaApi: !!adapter.updateCampaign, source: 'API', rawSnapshot: c.raw as Prisma.InputJsonValue, lastSyncedAt: new Date() },
+        create: { organizationId: account.organizationId, channelAccountId: account.id, externalId: c.externalId, name: c.name, type: c.type, status, dailyBudget: c.dailyBudget, totalBudget: c.totalBudget, startDate: c.startDate, endDate: c.endDate, isManagedViaApi: !!adapter.updateCampaign, source: 'API', rawSnapshot: c.raw as Prisma.InputJsonValue, lastSyncedAt: new Date() },
       });
     }
     const to = new Date(); const from = new Date(Date.now() - days * 86_400_000);
@@ -134,6 +135,15 @@ export class AdsService {
     await this.audit.log(user, 'ads.campaign_update', 'AdvertisingCampaign', campaignId, { status: c.status, dailyBudget: c.dailyBudget }, data);
     return updated;
   }
+}
+
+export function mapCampaignStatus(raw: string): CampaignStatus {
+  const s = (raw ?? '').toUpperCase().replace(/[\s_-]/g, '');
+  if (['ACTIVE', 'ENABLED', 'RUNNING', 'DELIVERING'].includes(s)) return 'ACTIVE';
+  if (['PAUSED', 'STOPPED', 'DISABLED'].includes(s)) return 'PAUSED';
+  if (['ENDED', 'ARCHIVED', 'COMPLETED', 'FINISHED'].includes(s)) return 'ENDED';
+  if (['DRAFT', 'PENDING'].includes(s)) return 'DRAFT';
+  return 'UNKNOWN';
 }
 
 function parseDate(v: string) { const m = v.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})/); if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])); const d = new Date(v); return Number.isNaN(d.getTime()) ? undefined : d; }
