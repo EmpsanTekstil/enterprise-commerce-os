@@ -108,11 +108,18 @@ jobs:
           '
           gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/ui.md)" >/dev/null || true
       - name: Docker imajları derlenebilir mi
+        id: docker
         run: |
-          docker build -f infra/api.Dockerfile -t eco-api:ci . 2>&1 | tail -40
-          test ${PIPESTATUS[0]} -eq 0
-          docker build -f infra/web.Dockerfile -t eco-web:ci . 2>&1 | tail -40
-          test ${PIPESTATUS[0]} -eq 0
+          set -o pipefail
+          docker build -f infra/api.Dockerfile -t eco-api:ci . 2>&1 | tee /tmp/docker-api.log | tail -5
+          docker build -f infra/web.Dockerfile -t eco-web:ci . 2>&1 | tee /tmp/docker-web.log | tail -5
+      - name: Docker hata logu
+        if: failure() && steps.docker.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          { printf '### Docker derleme hatası\n```\n'; grep -iE "error|ERR|failed|not found|Cannot" /tmp/docker-api.log /tmp/docker-web.log 2>/dev/null | tail -25; printf '\n--- son satırlar ---\n'; tail -15 /tmp/docker-api.log 2>/dev/null; tail -15 /tmp/docker-web.log 2>/dev/null; printf '\n```\n'; } > /tmp/d.md
+          gh api repos/${{ github.repository }}/commits/${{ github.sha }}/comments -f body="$(cat /tmp/d.md)" >/dev/null || true
       # Üretilen migration ve lock dosyalarını depoya geri yaz (yalnızca main, yalnızca değişiklik varsa)
       - name: Üretilen dosyaları commit et
         if: github.ref == 'refs/heads/main'
